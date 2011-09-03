@@ -1,0 +1,4 @@
+env :development, :test do
+  gem "minitest", "~> 2.5.1"
+  gem "rake-compiler", "~> 0.7.9"
+end
