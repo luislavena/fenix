@@ -83,9 +83,6 @@ expand_path(int argc, VALUE *argv)
 	// retrieve path and dir from argv
 	rb_scan_args(argc, argv, "11", &path, &dir);
 
-	// What CodePage should we use?
-	cp = AreFileApisANSI() ? CP_ACP : CP_OEMCP;
-
 	// convert char * to wchar_t
 	// path
 	if (!NIL_P(path)) {
@@ -174,6 +171,9 @@ expand_path(int argc, VALUE *argv)
 		// sanitize backslashes with forwardslashes
 		replace_wchar(wfullpath, L'\\', L'/');
 		// wprintf(L"wfullpath: '%s'\n", wfullpath);
+
+		// What CodePage should we use?
+		cp = AreFileApisANSI() ? CP_ACP : CP_OEMCP;
 
 		// convert to char *
 		size = WideCharToMultiByte(cp, 0, wfullpath, -1, NULL, 0, NULL, NULL);
