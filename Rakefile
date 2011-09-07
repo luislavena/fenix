@@ -13,6 +13,7 @@ Rake::TestTask.new(:spec) do |t|
 end
 
 Rake::ExtensionTask.new("fenix") do |ext|
+  ext.config_options << "--enable-debug"
 end
 
 # compile before running specs
