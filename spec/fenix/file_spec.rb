@@ -65,5 +65,11 @@ describe Fenix::File do
         subject.expand_path("~/a", "C:/FooBar").must_equal File.join(home, "a")
       end
     end
+
+    it "raises a TypeError if not passed a String type" do
+      proc { subject.expand_path(1)    }.must_raise TypeError
+      proc { subject.expand_path(nil)  }.must_raise TypeError
+      proc { subject.expand_path(true) }.must_raise TypeError
+    end
   end
 end

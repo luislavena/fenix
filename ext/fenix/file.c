@@ -83,6 +83,11 @@ fenix_file_expand_path(int argc, VALUE *argv)
 	// retrieve path and dir from argv
 	rb_scan_args(argc, argv, "11", &path, &dir);
 
+	// coerce them to string
+	path = StringValue(path);
+	if (!NIL_P(dir))
+		dir = StringValue(dir);
+
 	// convert char * to wchar_t
 	// path
 	if (!NIL_P(path)) {
