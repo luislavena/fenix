@@ -31,6 +31,9 @@ describe Fenix::File do
       subject.expand_path("a.").must_equal File.join(base, "a")
       subject.expand_path('.a').must_equal File.join(base, '.a')
       subject.expand_path('..a').must_equal File.join(base, '..a')
+
+      # this spec is not valid, a.. is not a valid file or directory name so
+      # b can't be inside of it
       subject.expand_path('a../b').must_equal File.join(base, 'a../b')
     end
 
