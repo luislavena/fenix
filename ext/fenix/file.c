@@ -1,7 +1,7 @@
 #include "fenix.h"
 
 static inline void
-replace_wchar(wchar_t *s, int find, int replace)
+fenix_replace_wchar(wchar_t *s, int find, int replace)
 {
 	while (*s != 0) {
 		if (*s == find)
@@ -11,7 +11,7 @@ replace_wchar(wchar_t *s, int find, int replace)
 }
 
 static wchar_t *
-home_dir()
+fenix_home_dir()
 {
 	wchar_t *buffer = NULL;
 	size_t buffer_len = 0, len = 0;
@@ -59,7 +59,7 @@ home_dir()
 
 	if (home_env) {
 		// sanitize backslashes with forwardslashes
-		replace_wchar(buffer, L'\\', L'/');
+		fenix_replace_wchar(buffer, L'\\', L'/');
 
 		// wprintf(L"home dir: '%s' using home_env (%i)\n", buffer, home_env);
 		return buffer;
@@ -70,7 +70,7 @@ home_dir()
 
 // TODO: can we fail allocating memory?
 static VALUE
-expand_path(int argc, VALUE *argv)
+fenix_file_expand_path(int argc, VALUE *argv)
 {
 	size_t size = 0, wpath_len = 0, wdir_len = 0, whome_len = 0;
 	size_t buffer_len = 0;
@@ -106,7 +106,7 @@ expand_path(int argc, VALUE *argv)
 	if (wpath && wpath_len) {
 		// determine if is expanding home directory (~)
 		if (*wpath_pos == L'~') {
-			if (whome = home_dir()) {
+			if (whome = fenix_home_dir()) {
 				whome_len = wcslen(whome);
 				buffer_len += (whome_len + wpath_len);
 
@@ -169,7 +169,7 @@ expand_path(int argc, VALUE *argv)
 		GetFullPathNameW(buffer, size, wfullpath, NULL);
 
 		// sanitize backslashes with forwardslashes
-		replace_wchar(wfullpath, L'\\', L'/');
+		fenix_replace_wchar(wfullpath, L'\\', L'/');
 		// wprintf(L"wfullpath: '%s'\n", wfullpath);
 
 		// What CodePage should we use?
@@ -212,5 +212,5 @@ void Init_fenix_file()
 {
 	cFenixFile = rb_define_class_under(mFenix, "File", rb_cObject);
 
-	rb_define_singleton_method(cFenixFile, "expand_path", expand_path, -1);
+	rb_define_singleton_method(cFenixFile, "expand_path", fenix_file_expand_path, -1);
 }
