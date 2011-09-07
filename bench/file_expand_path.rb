@@ -8,6 +8,9 @@ tmp = []
 long_path = tmp.join(File::SEPARATOR)
 full_long_path = File.join("C:", long_path)
 
+to_path       = Class.new { def to_path; "a/b/c"; end }.new
+full_to_path  = Class.new { def to_path; "C:/FooBar"; end }.new
+
 TESTS = 10_000
 
 puts "File.expand_path: #{TESTS} times."
@@ -47,4 +50,16 @@ Benchmark.bmbm do |results|
 
   results.report("Ruby full_long_path") { TESTS.times { File.expand_path(full_long_path) } }
   results.report("Fenix full_long_path") { TESTS.times { Fenix::File.expand_path(full_long_path) } }
+
+  results.report("Ruby to_path") { TESTS.times { File.expand_path(to_path) } }
+  results.report("Fenix to_path") { TESTS.times { Fenix::File.expand_path(to_path) } }
+
+  results.report("Ruby to_path, 'rel'") { TESTS.times { File.expand_path(to_path, 'rel') } }
+  results.report("Fenix to_path, 'rel'") { TESTS.times { Fenix::File.expand_path(to_path, 'rel') } }
+
+  results.report("Ruby to_path, 'C:/Foo'") { TESTS.times { File.expand_path(to_path, 'C:/Foo') } }
+  results.report("Fenix to_path, 'C:/Foo'") { TESTS.times { Fenix::File.expand_path(to_path, 'C:/Foo') } }
+
+  results.report("Ruby full_to_path") { TESTS.times { File.expand_path(full_to_path) } }
+  results.report("Fenix full_to_path") { TESTS.times { Fenix::File.expand_path(full_to_path) } }
 end

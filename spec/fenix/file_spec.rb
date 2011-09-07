@@ -95,5 +95,11 @@ describe Fenix::File do
       path.must_equal "#{base}/a/c"
       path.must_be_instance_of(String)
     end
+
+    it "accepts objects that have a #to_path method" do
+      klass = Class.new { def to_path; "a/b/c"; end }
+      obj = klass.new
+      subject.expand_path(obj).must_equal "#{base}/a/b/c"
+    end
   end
 end

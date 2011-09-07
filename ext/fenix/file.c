@@ -68,6 +68,20 @@ fenix_home_dir()
 	return NULL;
 }
 
+static VALUE
+fenix_coerce_to_path(VALUE obj)
+{
+	VALUE tmp;
+	ID to_path;
+
+	CONST_ID(to_path, "to_path");
+	tmp = rb_check_funcall(obj, to_path, 0, 0);
+	if (tmp == Qundef)
+		tmp = obj;
+
+	return StringValue(tmp);
+}
+
 // TODO: can we fail allocating memory?
 static VALUE
 fenix_file_expand_path(int argc, VALUE *argv)
@@ -84,9 +98,9 @@ fenix_file_expand_path(int argc, VALUE *argv)
 	rb_scan_args(argc, argv, "11", &path, &dir);
 
 	// coerce them to string
-	path = StringValue(path);
+	path = fenix_coerce_to_path(path);
 	if (!NIL_P(dir))
-		dir = StringValue(dir);
+		dir = fenix_coerce_to_path(dir);
 
 	// convert char * to wchar_t
 	// path
