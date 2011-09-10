@@ -50,6 +50,18 @@ describe Fenix::File do
       subject.expand_path(".", "#{rootdir}").must_equal rootdir
     end
 
+    # not compliant yet with MRI:
+    it "ignores supplied dir if path contains a drive letter" do
+      skip "pending implementation"
+      subject.expand_path(rootdir, "D:/").must_equal rootdir
+    end
+
+    it "removes trailing slashes from absolute path" do
+      skip "pending implementation"
+      subject.expand_path("#{rootdir}/foo/").must_equal File.join(rootdir, "foo")
+      subject.expand_path("#{rootdir}/foo.rb/").must_equal File.join(rootdir, "foo.rb")
+    end
+
     describe "~" do
       let(:home) { "C:/UserHome" }
 
