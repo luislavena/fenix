@@ -117,4 +117,22 @@ describe Fenix::File do
       subject.expand_path(obj).must_equal "#{base}/a/b/c"
     end
   end
+
+  describe "realpath" do
+    use_temporary_directory
+    let(:tmpdir) { Dir.pwd }
+
+    before :each do
+      # all this gets removed by 'use_temporary_directory', so don't worry.
+
+      File.write("foo.rb", "# noop")
+      Dir.mkdir("bar")
+      File.write("bar/baz", "# stuff")
+    end
+
+    it "returns the existing and absolute pathname relative to current" do
+      skip "implement me"
+      subject.realpath("foo.rb").must_equal File.join(tmpdir, "foo.rb")
+    end
+  end
 end
