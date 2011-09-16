@@ -116,6 +116,27 @@ describe Fenix::File do
       obj = klass.new
       subject.expand_path(obj).must_equal "#{base}/a/b/c"
     end
+
+    describe "(shortname)" do
+      use_temporary_directory
+      let(:tmpdir) { Dir.pwd }
+      let(:long_name) { "This is a directory with a long name" }
+
+      before :each do
+        Dir.mkdir long_name
+        output = `cmd.exe /C DIR /X`
+        @shortname = output.split.find { |o| o =~ /^THISIS/ }
+      end
+
+      it "do not expand non-existing shortnames" do
+        subject.expand_path("SHORT~1").must_include "SHORT~1"
+      end
+
+      it "expands a shortname directory into the full version" do
+        skip "implement me"
+        subject.expand_path(@shortname).must_include long_name
+      end
+    end
   end
 
   describe "realpath" do
