@@ -62,7 +62,7 @@ describe Fenix::File do
       subject.expand_path("#{rootdir}/foo.rb/").must_equal File.join(rootdir, "foo.rb")
     end
 
-    describe "~" do
+    describe "~/" do
       let(:home) { "C:/UserHome" }
 
       before :each do
@@ -84,6 +84,13 @@ describe Fenix::File do
         str = "~/a"
         subject.expand_path(str).must_equal "#{home}/a"
         str.must_equal "~/a"
+      end
+    end
+
+    describe "~username" do
+      it "raises ArgumentError for any supplied username [ruby-core:39597]" do
+        skip "implement me"
+        proc { subject.expand_path("~anything") }.must_raise ArgumentError
       end
     end
 
@@ -132,7 +139,7 @@ describe Fenix::File do
         subject.expand_path("SHORT~1").must_include "SHORT~1"
       end
 
-      it "expands a shortname directory into the full version" do
+      it "expands a shortname directory into the full version [ruby-core:39504]" do
         skip "implement me"
         subject.expand_path(@shortname).must_include long_name
       end
