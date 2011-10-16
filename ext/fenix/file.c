@@ -39,7 +39,7 @@ fenix_home_dir()
 
 	// allocate buffer
 	if (home_env)
-		buffer = (wchar_t *)xcalloc(buffer_len, sizeof(wchar_t));
+		buffer = (wchar_t *)malloc(buffer_len * sizeof(wchar_t));
 
 	switch (home_env) {
 		case 1: // HOME
@@ -90,7 +90,7 @@ fenix_file_expand_path(int argc, VALUE *argv)
 	size_t buffer_len = 0;
 	char *fullpath = NULL;
 	wchar_t *wfullpath = NULL, *wpath = NULL, *wpath_pos = NULL, *wdir = NULL;
-	wchar_t *whome = NULL, *buffer = NULL;
+	wchar_t *whome = NULL, *buffer = NULL, *buffer_pos = NULL;
 	UINT cp;
 	VALUE result = Qnil, path = Qnil, dir = Qnil;
 
@@ -105,8 +105,8 @@ fenix_file_expand_path(int argc, VALUE *argv)
 	// convert char * to wchar_t
 	// path
 	if (!NIL_P(path)) {
-		size = MultiByteToWideChar(CP_UTF8, 0, RSTRING_PTR(path), -1, NULL, 0);
-		wpath = wpath_pos = (wchar_t *)xcalloc(size + 1, sizeof(wchar_t));
+		size = MultiByteToWideChar(CP_UTF8, 0, RSTRING_PTR(path), -1, NULL, 0) + 1;
+		wpath = wpath_pos = (wchar_t *)malloc(size * sizeof(wchar_t));
 		MultiByteToWideChar(CP_UTF8, 0, RSTRING_PTR(path), -1, wpath, size);
 		wpath_len = wcslen(wpath);
 		// wprintf(L"wpath: '%s' with (%i) characters long.\n", wpath, wpath_len);
@@ -114,8 +114,8 @@ fenix_file_expand_path(int argc, VALUE *argv)
 
 	// dir
 	if (!NIL_P(dir)) {
-		size = MultiByteToWideChar(CP_UTF8, 0, RSTRING_PTR(dir), -1, NULL, 0);
-		wdir = (wchar_t *)xcalloc(size + 1, sizeof(wchar_t));
+		size = MultiByteToWideChar(CP_UTF8, 0, RSTRING_PTR(dir), -1, NULL, 0) + 1;
+		wdir = (wchar_t *)malloc(size * sizeof(wchar_t));
 		MultiByteToWideChar(CP_UTF8, 0, RSTRING_PTR(dir), -1, wdir, size);
 		wdir_len = wcslen(wdir);
 		// wprintf(L"wdir: '%s' with (%i) characters long.\n", wdir, wdir_len);
@@ -151,16 +151,18 @@ fenix_file_expand_path(int argc, VALUE *argv)
 	}
 
 	// wprintf(L"buffer_len: %i\n", buffer_len + 1);
-	buffer = (wchar_t *)xcalloc(buffer_len + 1, sizeof(wchar_t));
+	buffer = buffer_pos = (wchar_t *)malloc((buffer_len + 1) * sizeof(wchar_t));
 
 	// push home directory first
 	if (whome_len) {
 		// wprintf(L"Adding home '%s' to buffer\n", whome);
-		wcsncat(buffer, whome, whome_len);
+		wcsncpy(buffer_pos, whome, whome_len);
+		buffer_pos += whome_len;
 	} else if (wdir_len) {
 		// push dir into buffer if present (and ensure separator)
 		// wprintf(L"Adding dir '%s' to buffer\n", wdir);
-		wcsncat(buffer, wdir, wdir_len);
+		wcsncpy(buffer_pos, wdir, wdir_len);
+		buffer_pos += wdir_len;
 	}
 
 	// push path into buffer or default to "." (current)
@@ -168,14 +170,20 @@ fenix_file_expand_path(int argc, VALUE *argv)
 		// Only add separator if required
 		if (whome_len || wdir_len) {
 			// wprintf(L"Add separator slash to buffer\n");
-			wcsncat(buffer, L"/", 1);
+			wcsncpy(buffer_pos, L"/", 1);
+			buffer_pos += 1;
 		}
 
 		// wprintf(L"Adding '%s' to buffer\n", wpath_pos);
-		wcsncat(buffer, wpath_pos, wpath_len);
+		wcsncpy(buffer_pos, wpath_pos, wpath_len);
+		buffer_pos += wpath_len;
 	} else {
-		wcsncat(buffer, L".", 1);
+		wcsncpy(buffer_pos, L".", 1);
+		buffer_pos += 1;
 	}
+
+	/* Ensure buffer is NULL terminated */
+	buffer_pos[0] = L'\0';
 
 	// wprintf(L"buffer: '%s'\n", buffer);
 
@@ -184,7 +192,7 @@ fenix_file_expand_path(int argc, VALUE *argv)
 	size = GetFullPathNameW(buffer, 0, NULL, NULL);
 	if (size) {
 		// allocate enough memory to contain the response
-		wfullpath = (wchar_t *)xcalloc(size, sizeof(wchar_t));
+		wfullpath = (wchar_t *)malloc(size * sizeof(wchar_t));
 		GetFullPathNameW(buffer, size, wfullpath, NULL);
 
 		// sanitize backslashes with forwardslashes
@@ -195,8 +203,8 @@ fenix_file_expand_path(int argc, VALUE *argv)
 		cp = AreFileApisANSI() ? CP_ACP : CP_OEMCP;
 
 		// convert to char *
-		size = WideCharToMultiByte(cp, 0, wfullpath, -1, NULL, 0, NULL, NULL);
-		fullpath = (char *)xcalloc(size, sizeof(char));
+		size = WideCharToMultiByte(cp, 0, wfullpath, -1, NULL, 0, NULL, NULL) + 1;
+		fullpath = (char *)malloc(size * sizeof(char));
 		WideCharToMultiByte(cp, 0, wfullpath, -1, fullpath, size, NULL, NULL);
 
 		// convert to VALUE and set the filesystem encoding
@@ -205,22 +213,22 @@ fenix_file_expand_path(int argc, VALUE *argv)
 
 	// TODO: better cleanup
 	if (buffer)
-		xfree(buffer);
+		free(buffer);
 
 	if (wpath)
-		xfree(wpath);
+		free(wpath);
 
 	if (wdir)
-		xfree(wdir);
+		free(wdir);
 
 	if (whome)
-		xfree(whome);
+		free(whome);
 
 	if (wfullpath)
-		xfree(wfullpath);
+		free(wfullpath);
 
 	if (fullpath)
-		xfree(fullpath);
+		free(fullpath);
 
 	return result;
 }
