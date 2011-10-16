@@ -10,6 +10,10 @@ fenix_replace_wchar(wchar_t *s, int find, int replace)
 	}
 }
 
+/*
+  Return user's home directory using environment variables combinations.
+  Memory allocated by this function should be manually freeded afterwards.
+*/
 static wchar_t *
 fenix_home_dir()
 {
@@ -20,6 +24,12 @@ fenix_home_dir()
 	// determine User's home directory trying:
 	// HOME, HOMEDRIVE + HOMEPATH and USERPROFILE environment variables
 	// TODO: Special Folders - Profile and Personal
+
+	/*
+	  GetEnvironmentVariableW when used with NULL will return the required
+	  buffer size and its terminating character.
+	  http://msdn.microsoft.com/en-us/library/windows/desktop/ms683188(v=vs.85).aspx
+	*/
 
 	if (len = GetEnvironmentVariableW(L"HOME", NULL, 0)) {
 		buffer_len = len;
