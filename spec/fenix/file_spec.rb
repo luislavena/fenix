@@ -83,6 +83,20 @@ describe Fenix::File do
         subject.expand_path(str).must_equal "#{home}/a"
         str.must_equal "~/a"
       end
+
+      describe "(non-absolute)" do
+        let(:home) { "." }
+
+        it "raises ArgumentError when having non-absolute home directories" do
+          skip "implement me"
+          proc { subject.expand_path("~") }.must_raise ArgumentError
+        end
+
+        it "raises ArgumentError when having non-absolute home of a specified user" do
+          skip "implement me"
+          proc { subject.expand_path("~anything") }.must_raise ArgumentError
+        end
+      end
     end
 
     describe "~username" do
