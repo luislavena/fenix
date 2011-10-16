@@ -30,11 +30,17 @@ Benchmark.bmbm do |results|
   results.report("Ruby 'foo', 'C:/'") { TESTS.times {  File.expand_path('foo', 'C:/') } }
   results.report("Fenix 'foo', 'C:/'") { TESTS.times { Fenix::File.expand_path('foo', 'C:/') } }
 
+  results.report("Ruby 'D:/Bar', 'C:/Foo'") { TESTS.times {  File.expand_path('D:/Bar', 'C:/Foo') } }
+  results.report("Fenix 'D:/Bar', 'C:/Foo'") { TESTS.times { Fenix::File.expand_path('D:/Bar', 'C:/Foo') } }
+
   results.report("Ruby '~'") { TESTS.times {  File.expand_path('~') } }
   results.report("Fenix '~'") { TESTS.times { Fenix::File.expand_path('~') } }
 
   results.report("Ruby '~/foo'") { TESTS.times {  File.expand_path('~/foo') } }
   results.report("Fenix '~/foo'") { TESTS.times { Fenix::File.expand_path('~/foo') } }
+
+  results.report("Ruby 'foo/'") { TESTS.times {  File.expand_path('foo/') } }
+  results.report("Fenix 'foo/'") { TESTS.times { Fenix::File.expand_path('foo/') } }
 
   results.report("Ruby '~', 'C:/Foo'") { TESTS.times {  File.expand_path('~', 'C:/Foo') } }
   results.report("Fenix '~', 'C:/Foo'") { TESTS.times { Fenix::File.expand_path('~', 'C:/Foo') } }
