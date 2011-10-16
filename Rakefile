@@ -19,9 +19,18 @@ end
 # compile before running specs
 task :spec => [:compile]
 
+desc "Execute benchmarks"
 task :bench => [:spec] do
   benchs = FileList["bench/*.rb"]
   benchs.each do |b|
     ruby "-Ilib #{b}"
+  end
+end
+
+namespace :bench do
+  desc "Execute benchmarks and include slow performing ones"
+  task :slow => [:spec] do
+    ENV["SLOW"] = "1"
+    Rake::Task["bench"].invoke
   end
 end

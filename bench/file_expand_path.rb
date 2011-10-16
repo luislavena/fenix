@@ -30,8 +30,11 @@ Benchmark.bmbm do |results|
   results.report("Ruby 'foo', 'C:/'") { TESTS.times {  File.expand_path('foo', 'C:/') } }
   results.report("Fenix 'foo', 'C:/'") { TESTS.times { Fenix::File.expand_path('foo', 'C:/') } }
 
-  results.report("Ruby 'D:/Bar', 'C:/Foo'") { TESTS.times {  File.expand_path('D:/Bar', 'C:/Foo') } }
-  results.report("Fenix 'D:/Bar', 'C:/Foo'") { TESTS.times { Fenix::File.expand_path('D:/Bar', 'C:/Foo') } }
+  # So slow, exclude them
+  if ENV["SLOW"]
+    results.report("Ruby 'D:/Bar', 'C:/Foo'") { TESTS.times {  File.expand_path('D:/Bar', 'C:/Foo') } }
+    results.report("Fenix 'D:/Bar', 'C:/Foo'") { TESTS.times { Fenix::File.expand_path('D:/Bar', 'C:/Foo') } }
+  end
 
   results.report("Ruby '~'") { TESTS.times {  File.expand_path('~') } }
   results.report("Fenix '~'") { TESTS.times { Fenix::File.expand_path('~') } }
