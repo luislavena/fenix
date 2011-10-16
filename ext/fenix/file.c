@@ -131,65 +131,82 @@ fenix_file_expand_path(int argc, VALUE *argv)
 		// wprintf(L"wdir: '%s' with (%i) characters long.\n", wdir, wdir_len);
 	}
 
-	// calculate buffer size required
-	if (wpath && wpath_len) {
-		// determine if is expanding home directory (~)
-		if (*wpath_pos == L'~') {
-			if (whome = fenix_home_dir()) {
-				whome_len = wcslen(whome);
-				buffer_len += (whome_len + wpath_len);
+	/* determine if we need the user's home directory */
+	if ((wpath_len == 1 && wpath_pos[0] == L'~') ||
+		(wpath_len >= 2 && wpath_pos[0] == L'~' && IS_DIR_SEPARATOR_P(wpath_pos[1]))) {
+		// wprintf(L"wpath requires expansion.\n");
+		whome = fenix_home_dir();
+		whome_len = wcslen(whome);
 
-				// exclude character from the result
-				wpath_pos += 1;
-				wpath_len -= 1;
+		// wprintf(L"whome: '%s' with (%i) characters long.\n", whome, whome_len);
 
-				// wprintf(L"whome: '%s' with (%i) characters long.\n", whome, whome_len);
-			} else {
-				// TODO: Handle failure?
-			}
-		} else {
-			buffer_len += wpath_len;
+		/* ignores dir since we are expading home */
+		wdir_len = 0;
+
+		/* exclude ~ from the result */
+		wpath_pos++;
+		wpath_len--;
+
+		/* exclude separator if present */
+		if (wpath_len && IS_DIR_SEPARATOR_P(wpath_pos[0])) {
+			// wprintf(L"excluding expansion character and separator\n");
+			wpath_pos++;
+			wpath_len--;
 		}
-	} else {
-		// "."
-		buffer_len += 1;
+	} else if (wpath_len >= 2 && wpath_pos[1] == L':') {
+		/* ignore dir since path contains a drive letter */
+		// wprintf(L"Ignore dir since we have drive letter\n");
+		wdir_len = 0;
 	}
 
-	// make room in buffer for dir + 1 (slash)
-	if (wdir && wdir_len) {
-		buffer_len += wdir_len + 1;
-	}
+	// wprintf(L"wpath_len: %i\n", wpath_len);
+	// wprintf(L"wdir_len: %i\n", wdir_len);
+	// wprintf(L"whome_len: %i\n", whome_len);
 
+	buffer_len = wpath_len + 1 + wdir_len + 1 + whome_len + 1;
 	// wprintf(L"buffer_len: %i\n", buffer_len + 1);
+
 	buffer = buffer_pos = (wchar_t *)malloc((buffer_len + 1) * sizeof(wchar_t));
 
-	// push home directory first
+	/* add home */
 	if (whome_len) {
-		// wprintf(L"Adding home '%s' to buffer\n", whome);
+		// wprintf(L"Copying whome...\n");
 		wcsncpy(buffer_pos, whome, whome_len);
 		buffer_pos += whome_len;
-	} else if (wdir_len) {
-		// push dir into buffer if present (and ensure separator)
-		// wprintf(L"Adding dir '%s' to buffer\n", wdir);
+	}
+
+	/* Add separator if required */
+	if (whome_len && wcsrchr(L"\\/:", buffer_pos[-1]) == NULL) {
+		// wprintf(L"Adding separator after whome\n");
+		buffer_pos[0] = L'\\';
+		buffer_pos++;
+	}
+
+	if (wdir_len) {
+		// wprintf(L"Copying wdir...\n");
 		wcsncpy(buffer_pos, wdir, wdir_len);
 		buffer_pos += wdir_len;
 	}
 
-	// push path into buffer or default to "." (current)
-	if (wpath_len) {
-		// Only add separator if required
-		if (whome_len || wdir_len) {
-			// wprintf(L"Add separator slash to buffer\n");
-			wcsncpy(buffer_pos, L"/", 1);
-			buffer_pos += 1;
-		}
+	/* add separator if required */
+	if (wdir_len && wcsrchr(L"\\/:", buffer_pos[-1]) == NULL) {
+		// wprintf(L"Adding separator after wdir\n");
+		buffer_pos[0] = L'\\';
+		buffer_pos++;
+	}
 
-		// wprintf(L"Adding '%s' to buffer\n", wpath_pos);
+	/* now deal with path */
+	if (wpath_len) {
+		// wprintf(L"Copying wpath...\n");
 		wcsncpy(buffer_pos, wpath_pos, wpath_len);
 		buffer_pos += wpath_len;
-	} else {
-		wcsncpy(buffer_pos, L".", 1);
-		buffer_pos += 1;
+	}
+
+	/* GetFullPathNameW requires at least "." to determine current directory */
+	if (wpath_len == 0) {
+		// wprintf(L"Adding '.' to buffer\n");
+		buffer_pos[0] = L'.';
+		buffer_pos++;
 	}
 
 	/* Ensure buffer is NULL terminated */
@@ -204,6 +221,15 @@ fenix_file_expand_path(int argc, VALUE *argv)
 		// allocate enough memory to contain the response
 		wfullpath = (wchar_t *)malloc(size * sizeof(wchar_t));
 		GetFullPathNameW(buffer, size, wfullpath, NULL);
+
+		/* Calculate the new size and leave the garbage out */
+		size = wcslen(wfullpath);
+
+		/* Remove any trailing slashes */
+		if (IS_DIR_SEPARATOR_P(wfullpath[size - 1]) && wfullpath[size - 2] != L':') {
+			// wprintf(L"Removing trailing slash\n");
+			wfullpath[size - 1] = L'\0';
+		}
 
 		// sanitize backslashes with forwardslashes
 		fenix_replace_wchar(wfullpath, L'\\', L'/');
