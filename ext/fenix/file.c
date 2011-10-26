@@ -269,11 +269,19 @@ fenix_file_expand_path(int argc, VALUE *argv)
 	return result;
 }
 
+static VALUE
+fenix_file_replace()
+{
+	rb_define_singleton_method(rb_cFile, "expand_path", fenix_file_expand_path, -1);
+	return Qtrue;
+}
+
 VALUE cFenixFile;
 
 void Init_fenix_file()
 {
 	cFenixFile = rb_define_class_under(mFenix, "File", rb_cObject);
 
+	rb_define_singleton_method(cFenixFile, "replace!", fenix_file_replace, 0);
 	rb_define_singleton_method(cFenixFile, "expand_path", fenix_file_expand_path, -1);
 }
