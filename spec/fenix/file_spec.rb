@@ -50,7 +50,6 @@ describe Fenix::File do
       subject.expand_path(".", "#{rootdir}").must_equal rootdir
     end
 
-    # not compliant yet with MRI:
     it "ignores supplied dir if path contains a drive letter" do
       subject.expand_path(rootdir, "D:/").must_equal rootdir
     end
