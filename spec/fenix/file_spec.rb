@@ -1,10 +1,22 @@
 require "spec_helper"
 
 describe Fenix::File do
+#  subject { File }
   subject { Fenix::File }
   let(:base) { Dir.pwd }
   let(:tmpdir) { "C:/Temporary" }
   let(:rootdir) { "C:/" }
+  let(:drive) { Dir.pwd[%r'\A(?:[a-z]:|//[^/]+/[^/]+)'i] }
+  let(:os_version) do
+    require 'win32ole'
+    locator = WIN32OLE.new("WbemScripting.SWbemLocator")
+    server = locator.ConnectServer(".","root/cimv2")
+    version = nil
+    server.ExecQuery("select * from Win32_OperatingSystem").each do |os|
+      version = os.Version
+    end
+    version
+  end
 
   describe "expand_path" do
     it "converts an empty pathname into absolute current pathname" do
@@ -34,6 +46,7 @@ describe Fenix::File do
 
       # this spec is not valid, a.. is not a valid file or directory name so
       # b can't be inside of it
+      skip "XP doesn't pass the following. Result is '#{base}/a./b'" if os_version =~ /^5\.1/
       subject.expand_path('a../b').must_equal File.join(base, 'a../b')
     end
 
@@ -59,16 +72,70 @@ describe Fenix::File do
       subject.expand_path("#{rootdir}/foo.rb/").must_equal File.join(rootdir, "foo.rb")
     end
 
+    it "removes trailing spaces from absolute path" do
+      subject.expand_path("#{rootdir}/a ").must_equal File.join(rootdir, "a")
+    end
+
+    it "removes trailing dots from absolute path" do
+      subject.expand_path("#{rootdir}/a.").must_equal File.join(rootdir, "a")
+    end
+
+    it "removes trailing invalid ':$DATA' from absolute path" do
+      subject.expand_path("#{rootdir}/aaa::$DATA").must_equal File.join(rootdir, "aaa")
+      subject.expand_path("#{rootdir}/aa:a:$DATA").must_equal File.join(rootdir, "aa:a")
+      subject.expand_path("#{rootdir}/aaa:$DATA").must_equal File.join(rootdir, "aaa:$DATA")
+    end
+
+    it "converts a pathname with a drive letter but no slash [ruby-core:31591]" do
+      subject.expand_path('c:').must_match /\Ac:\//i
+    end
+
+    it "converts a pathname with a drive letter ignoring different drive dir [ruby-core:42177]" do
+      subject.expand_path('c:foo', 'd:/bar').must_match /\Ac:\//i
+    end
+
+    it "converts a pathname with a drive letter using same drive dir [ruby-core:42177]" do
+      subject.expand_path('c:foo', 'c:/bar').must_match %r'\Ac:/bar/foo\z'i
+    end
+
+    it "converts a pathname which starts with a slash using dir's drive" do
+      subject.expand_path('/foo', "z:/bar").must_match %r"\Az:/foo\z"i
+    end
+
+    it "converts a dot with UNC dir" do
+      subject.expand_path('.', "//").must_equal "//"
+    end
+
+    it "converts a pathname which starts with a slash using '//host/share'" do
+      subject.expand_path('/foo', "//host/share/bar").must_match %r"\A//host/share/foo\z"i
+    end
+
+    it "converts a pathname which starts with a slash using a current drive" do
+      subject.expand_path('/foo').must_match %r"\A#{drive}/foo\z"i
+    end
+
     describe "~/" do
       let(:home) { "C:/UserHome" }
+      let(:home_drive) { nil }
+      let(:home_path) { nil }
+      let(:user_profile) { nil }
 
       before :each do
         @old_home = ENV["HOME"]
+        @old_home_drive = ENV["HOMEDRIVE"]
+        @old_home_path = ENV["HOMEPATH"]
+        @old_user_profile = ENV["USERPROFILE"]
         ENV["HOME"] = home
+        ENV["HOMEDRIVE"] = home_drive
+        ENV["HOMEPATH"] = home_path
+        ENV["USERPROFILE"] = user_profile
       end
 
       after :each do
         ENV["HOME"] = @old_home if @old_home
+        ENV["HOMEDRIVE"] = @old_home_drive if @old_home_drive
+        ENV["HOMEPATH"] = @old_home_path if @old_home_path
+        ENV["USERPROFILE"] = @old_user_profile if @old_user_profile
       end
 
       it "converts a pathname to an absolute pathname, using ~ (home) as base" do
@@ -83,16 +150,25 @@ describe Fenix::File do
         str.must_equal "~/a"
       end
 
+      describe "(nil)" do
+        let(:home) { nil }
+        let(:home_drive) { nil }
+        let(:home_path) { nil }
+        let(:user_profile) { nil }
+
+        it "raises ArgumentError when home is nothing" do
+          proc { subject.expand_path("~") }.must_raise ArgumentError
+        end
+      end
+
       describe "(non-absolute)" do
         let(:home) { "." }
 
         it "raises ArgumentError when having non-absolute home directories" do
-          skip "implement me"
           proc { subject.expand_path("~") }.must_raise ArgumentError
         end
 
         it "raises ArgumentError when having non-absolute home of a specified user" do
-          skip "implement me"
           proc { subject.expand_path("~anything") }.must_raise ArgumentError
         end
       end
@@ -100,7 +176,6 @@ describe Fenix::File do
 
     describe "~username" do
       it "raises ArgumentError for any supplied username [ruby-core:39597]" do
-        skip "implement me"
         proc { subject.expand_path("~anything") }.must_raise ArgumentError
       end
     end
@@ -151,8 +226,33 @@ describe Fenix::File do
       end
 
       it "expands a shortname directory into the full version [ruby-core:39504]" do
-        skip "implement me"
-        subject.expand_path(@shortname).must_include long_name
+        if subject == Fenix::File
+          subject.expand_path(@shortname, nil, 1).must_include long_name
+        else
+          subject.expand_path(@shortname).must_include long_name
+        end
+      end
+    end
+
+    describe "encoding" do
+      it "expands using path encoding not file system encoding" do
+        if Encoding.find("filesystem") == Encoding::CP1251
+          a = "#{drive}/\u3042\u3044\u3046\u3048\u304a".encode("cp932")
+        else
+          a = "#{drive}/\u043f\u0440\u0438\u0432\u0435\u0442".encode("cp1251")
+        end
+        subject.expand_path(a).must_equal a
+      end
+
+      it "removes trailing backslashes unless it's not in multibyte characters" do
+        a = "#{drive}/\225\\\\"
+        if File::ALT_SEPARATOR == '\\'
+          [%W"cp437 #{drive}/\225", %W"cp932 #{drive}/\225\\"]
+        else
+          [["cp437", a], ["cp932", a]]
+        end.each do |cp, expected|
+          subject.expand_path(a.dup.force_encoding(cp)).must_equal expected.force_encoding(cp), cp
+        end
       end
     end
   end
