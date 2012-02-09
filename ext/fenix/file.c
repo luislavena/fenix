@@ -396,14 +396,26 @@ fenix_code_page(rb_encoding *enc)
 {
 	VALUE code_page_value, name_key;
 	VALUE encoding, names_ary = Qundef, name;
+	char *enc_name;
+	struct RString fake_str;
 	ID names;
 	long i;
 
 	if (!enc)
 		return system_code_page();
 
-	name_key = rb_usascii_str_new2(rb_enc_name(enc));
-	code_page_value = rb_hash_aref(rb_code_page, name_key);
+	enc_name = (char *)rb_enc_name(enc);
+
+	fake_str.basic.flags = T_STRING|RSTRING_NOEMBED;
+	fake_str.basic.klass = rb_cString;
+	fake_str.as.heap.len = strlen(enc_name);
+	fake_str.as.heap.ptr = enc_name;
+	fake_str.as.heap.aux.capa = fake_str.as.heap.len;
+	name_key = (VALUE)&fake_str;
+	ENCODING_CODERANGE_SET(name_key, rb_usascii_encindex(), ENC_CODERANGE_7BIT);
+	OBJ_FREEZE(name_key);
+
+	code_page_value = rb_hash_lookup(rb_code_page, name_key);
 	if (code_page_value != Qnil) {
 		// printf("cached code page: %i\n", FIX2INT(code_page_value));
 		if (FIX2INT(code_page_value) == -1) {
@@ -412,6 +424,8 @@ fenix_code_page(rb_encoding *enc)
 			return (UINT)FIX2INT(code_page_value);
 		}
 	}
+
+	name_key = rb_usascii_str_new2(enc_name);
 
 	encoding = rb_enc_from_encoding(enc);
 	if (!NIL_P(encoding)) {
