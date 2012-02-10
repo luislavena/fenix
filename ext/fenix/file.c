@@ -679,17 +679,21 @@ fenix_file_expand_path(int argc, VALUE *argv)
 		} else {
 			wfullpath = wfullpath_buffer;
 		}
+		// wprintf(L"wfullpath: '%s'\n", wfullpath);
 
 
 		/* Calculate the new size and leave the garbage out */
 		// size = wcslen(wfullpath);
 
 		/* Remove any trailing slashes */
-		if (IS_DIR_SEPARATOR_P(wfullpath[size - 1]) && wfullpath[size - 2] != L':') {
+		if (IS_DIR_SEPARATOR_P(wfullpath[size - 1]) &&
+			wfullpath[size - 2] != L':' &&
+			!(size == 2 && IS_DIR_UNC_P(wfullpath))) {
 			// wprintf(L"Removing trailing slash\n");
 			size -= 1;
 			wfullpath[size] = L'\0';
 		}
+		// wprintf(L"wfullpath: '%s'\n", wfullpath);
 
 		/* Remove any trailing dot */
 		if (wfullpath[size - 1] == L'.') {
