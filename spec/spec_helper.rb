@@ -10,5 +10,6 @@ require "minitest/spec"
 require "minitest/autorun"
 
 require "support/temporary_directory"
+require "support/windows_version"
 
 require "fenix"

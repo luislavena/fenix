@@ -1,22 +1,11 @@
 require "spec_helper"
 
 describe Fenix::File do
-#  subject { File }
   subject { Fenix::File }
   let(:base) { Dir.pwd }
   let(:tmpdir) { "C:/Temporary" }
   let(:rootdir) { "C:/" }
   let(:drive) { Dir.pwd[%r'\A(?:[a-z]:|//[^/]+/[^/]+)'i] }
-  let(:os_version) do
-    require 'win32ole'
-    locator = WIN32OLE.new("WbemScripting.SWbemLocator")
-    server = locator.ConnectServer(".","root/cimv2")
-    version = nil
-    server.ExecQuery("select * from Win32_OperatingSystem").each do |os|
-      version = os.Version
-    end
-    version
-  end
 
   describe "expand_path" do
     it "converts an empty pathname into absolute current pathname" do
