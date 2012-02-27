@@ -36,6 +36,10 @@ module Support
     def os_version
       Kernel32.os_version
     end
+
+    def windows_xp?
+      !os_version.match(/^5\.1/).nil?
+    end
   end
 end
 

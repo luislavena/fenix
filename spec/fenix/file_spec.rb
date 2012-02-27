@@ -35,7 +35,7 @@ describe Fenix::File do
 
       # this spec is not valid, a.. is not a valid file or directory name so
       # b can't be inside of it
-      skip "XP doesn't pass the following. Result is '#{base}/a./b'" if os_version =~ /^5\.1/
+      skip "XP doesn't pass the following. Result is '#{base}/a./b'" if windows_xp?
       subject.expand_path('a../b').must_equal File.join(base, 'a../b')
     end
 
