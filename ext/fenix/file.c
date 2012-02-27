@@ -354,13 +354,6 @@ fenix_replace_to_long_name(wchar_t **wfullpath, size_t size, int heap) {
 		pos--;
 	}
 
-	/*
-	  Avoid FindFirstFileW over non-existing path.
-	  GetFileAttributesW is faster to check if path doesn't exists.
-	*/
-	if (GetFileAttributesW(*wfullpath) == INVALID_FILE_ATTRIBUTES)
-		return size;
-
 	find_handle = FindFirstFileW(*wfullpath, &find_data);
 	if (find_handle != INVALID_HANDLE_VALUE) {
 		size_t trail_pos = wcslen(*wfullpath);
@@ -403,14 +396,26 @@ fenix_code_page(rb_encoding *enc)
 {
 	VALUE code_page_value, name_key;
 	VALUE encoding, names_ary = Qundef, name;
+	char *enc_name;
+	struct RString fake_str;
 	ID names;
 	long i;
 
 	if (!enc)
 		return system_code_page();
 
-	name_key = rb_usascii_str_new2(rb_enc_name(enc));
-	code_page_value = rb_hash_aref(rb_code_page, name_key);
+	enc_name = (char *)rb_enc_name(enc);
+
+	fake_str.basic.flags = T_STRING|RSTRING_NOEMBED;
+	fake_str.basic.klass = rb_cString;
+	fake_str.as.heap.len = strlen(enc_name);
+	fake_str.as.heap.ptr = enc_name;
+	fake_str.as.heap.aux.capa = fake_str.as.heap.len;
+	name_key = (VALUE)&fake_str;
+	ENCODING_CODERANGE_SET(name_key, rb_usascii_encindex(), ENC_CODERANGE_7BIT);
+	OBJ_FREEZE(name_key);
+
+	code_page_value = rb_hash_lookup(rb_code_page, name_key);
 	if (code_page_value != Qnil) {
 		// printf("cached code page: %i\n", FIX2INT(code_page_value));
 		if (FIX2INT(code_page_value) == -1) {
@@ -419,6 +424,8 @@ fenix_code_page(rb_encoding *enc)
 			return (UINT)FIX2INT(code_page_value);
 		}
 	}
+
+	name_key = rb_usascii_str_new2(enc_name);
 
 	encoding = rb_enc_from_encoding(enc);
 	if (!NIL_P(encoding)) {
@@ -672,17 +679,21 @@ fenix_file_expand_path(int argc, VALUE *argv)
 		} else {
 			wfullpath = wfullpath_buffer;
 		}
+		// wprintf(L"wfullpath: '%s'\n", wfullpath);
 
 
 		/* Calculate the new size and leave the garbage out */
 		// size = wcslen(wfullpath);
 
 		/* Remove any trailing slashes */
-		if (IS_DIR_SEPARATOR_P(wfullpath[size - 1]) && wfullpath[size - 2] != L':') {
+		if (IS_DIR_SEPARATOR_P(wfullpath[size - 1]) &&
+			wfullpath[size - 2] != L':' &&
+			!(size == 2 && IS_DIR_UNC_P(wfullpath))) {
 			// wprintf(L"Removing trailing slash\n");
 			size -= 1;
 			wfullpath[size] = L'\0';
 		}
+		// wprintf(L"wfullpath: '%s'\n", wfullpath);
 
 		/* Remove any trailing dot */
 		if (wfullpath[size - 1] == L'.') {

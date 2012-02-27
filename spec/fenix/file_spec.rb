@@ -106,6 +106,12 @@ describe Fenix::File do
       subject.expand_path('.', "//").must_equal "//"
     end
 
+    it "preserves UNC path root" do
+      subject.expand_path("//").must_equal "//"
+      subject.expand_path("//.").must_equal "//"
+      subject.expand_path("//..").must_equal "//"
+    end
+
     it "converts a pathname which starts with a slash using '//host/share'" do
       subject.expand_path('/foo', "//host/share/bar").must_match %r"\A//host/share/foo\z"i
     end
