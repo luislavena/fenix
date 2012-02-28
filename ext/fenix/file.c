@@ -320,64 +320,6 @@ fenix_remove_invalid_alternative_data(wchar_t *wfullpath, size_t size) {
 	return size;
 }
 
-/*
-  Replace the last part of the path to long name.
-  We try to avoid to call FindFirstFileW() since it takes long time.
-*/
-static inline size_t
-fenix_replace_to_long_name(wchar_t **wfullpath, size_t size, int heap) {
-	WIN32_FIND_DATAW find_data;
-	HANDLE find_handle;
-
-	/*
-	  Skip long name conversion if the path is already long name.
-	  Short name is 8.3 format.
-	  http://en.wikipedia.org/wiki/8.3_filename
-	  This check can be skipped for directory components that have file
-	  extensions longer than 3 characters, or total lengths longer than
-	  12 characters.
-	  http://msdn.microsoft.com/en-us/library/windows/desktop/aa364980(v=vs.85).aspx
-	*/
-	size_t const max_short_name_size = 8 + 1 + 3;
-	size_t const max_extension_size = 3;
-	size_t path_len = 1, extension_len = 0;
-	wchar_t *pos = *wfullpath + size - 1;
-	while (!IS_DIR_SEPARATOR_P(*pos) && pos != *wfullpath) {
-		if (!extension_len && *pos == L'.') {
-			extension_len = path_len - 1;
-		}
-		if (path_len > max_short_name_size || extension_len > max_extension_size) {
-			// wprintf(L"skip long name conversion: %s\n", pos);
-			return size;
-		}
-		path_len++;
-		pos--;
-	}
-
-	find_handle = FindFirstFileW(*wfullpath, &find_data);
-	if (find_handle != INVALID_HANDLE_VALUE) {
-		size_t trail_pos = wcslen(*wfullpath);
-		size_t file_len = wcslen(find_data.cFileName);
-
-		FindClose(find_handle);
-		while (trail_pos > 0) {
-			if (IS_DIR_SEPARATOR_P((*wfullpath)[trail_pos]))
-				break;
-			trail_pos--;
-		}
-		size = trail_pos + 1 + file_len;
-		if ((size + 1) > sizeof(*wfullpath) / sizeof((*wfullpath)[0])) {
-			wchar_t *buf = (wchar_t *)malloc((size + 1) * sizeof(wchar_t));
-			wcsncpy(buf, *wfullpath, trail_pos + 1);
-			if (heap)
-				free(*wfullpath);
-			*wfullpath = buf;
-		}
-		wcsncpy(*wfullpath + trail_pos + 1, find_data.cFileName, file_len + 1);
-	}
-	return size;
-}
-
 /* Return system code page. */
 static inline UINT system_code_page() {
 	return AreFileApisANSI() ? CP_ACP : CP_OEMCP;
@@ -466,18 +408,8 @@ fenix_file_expand_path(int argc, VALUE *argv)
 	int ignore_dir = 0;
 	rb_encoding *path_encoding;
 
-	// 1: convert to long name
-	// 0: not convert to long name
-	int to_long_name = 0;
-
-	VALUE to_long = Qnil;
-
 	// retrieve path and dir from argv
-	rb_scan_args(argc, argv, "12", &path, &dir, &to_long);
-
-	// convert to_long to int
-	if (!NIL_P(to_long))
-		to_long_name = FIX2INT(to_long);
+	rb_scan_args(argc, argv, "11", &path, &dir);
 
 	// get path encoding
 	if (NIL_P(dir)) {
@@ -510,9 +442,6 @@ fenix_file_expand_path(int argc, VALUE *argv)
 			rb_raise(rb_eArgError, "non-absolute home");
 		}
 		whome_len = wcslen(whome);
-
-		if (wpath_len == 1)
-			to_long_name = 0;
 
 		// wprintf(L"whome: '%s' with (%i) characters long.\n", whome, whome_len);
 
@@ -652,15 +581,11 @@ fenix_file_expand_path(int argc, VALUE *argv)
 		buffer_pos += wpath_len;
 	}
 
-	if ((wpath_len == 1 && buffer[0] == L'.') || (wpath_len == 2 && buffer[1] == L':'))
-		to_long_name = 0;
-
 	/* GetFullPathNameW requires at least "." to determine current directory */
 	if (wpath_len == 0) {
 		// wprintf(L"Adding '.' to buffer\n");
 		buffer_pos[0] = L'.';
 		buffer_pos++;
-		to_long_name = 0;
 	}
 
 	/* Ensure buffer is NULL terminated */
@@ -704,11 +629,6 @@ fenix_file_expand_path(int argc, VALUE *argv)
 
 		/* removes trailing invalid ':$DATA' */
 		size = fenix_remove_invalid_alternative_data(wfullpath, size);
-
-		/* Replace the trailing path to long name */
-		if (to_long_name)
-			size = fenix_replace_to_long_name(&wfullpath, size, (wfullpath != wfullpath_buffer));
-
 
 		// sanitize backslashes with forwardslashes
 		fenix_replace_wchar(wfullpath, L'\\', L'/');
