@@ -321,7 +321,8 @@ fenix_remove_invalid_alternative_data(wchar_t *wfullpath, size_t size) {
 }
 
 /* Return system code page. */
-static inline UINT system_code_page() {
+static inline UINT
+system_code_page() {
 	return AreFileApisANSI() ? CP_ACP : CP_OEMCP;
 }
 
@@ -677,7 +678,8 @@ fenix_file_replace()
 
 VALUE cFenixFile;
 
-void Init_fenix_file()
+void
+Init_fenix_file()
 {
 	cFenixFile = rb_define_class_under(mFenix, "File", rb_cObject);
 
