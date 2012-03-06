@@ -539,6 +539,17 @@ fenix_file_expand_path(int argc, VALUE *argv)
 		}
 	}
 
+	if (!ignore_dir && wpath_len >= 2 && IS_DIR_UNC_P(wpath)) {
+		/* ignore dir since path has UNC root */
+		ignore_dir = 1;
+		wdir_len = 0;
+	} else if (!ignore_dir && wpath_len >= 1 && IS_DIR_SEPARATOR_P(wpath[0]) &&
+		!dir_drive && !(wdir_len >= 2 && IS_DIR_UNC_P(wdir))) {
+		/* ignore dir since path has root slash and dir doesn't have drive or UNC root */
+		ignore_dir = 1;
+		wdir_len = 0;
+	}
+
 	// wprintf(L"wpath_len: %i\n", wpath_len);
 	// wprintf(L"wdir_len: %i\n", wdir_len);
 	// wprintf(L"whome_len: %i\n", whome_len);

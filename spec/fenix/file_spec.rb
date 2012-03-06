@@ -91,6 +91,18 @@ describe Fenix::File do
       subject.expand_path('/foo', "z:/bar").must_match %r"\Az:/foo\z"i
     end
 
+    it "converts a pathname which starts with a slash ignoring dir" do
+      # This spec is from TestPathname#test_expand_path of test/pathname/test_pathname.rb
+      subject.expand_path('/foo', "/bar").must_match %r"\Ac:/foo\z"i
+      subject.expand_path('/foo', "bar").must_match %r"\Ac:/foo\z"i
+    end
+
+    it "converts a pathname which starts with a slash and UNC pathname" do
+      subject.expand_path('//foo', "//bar").must_equal "//foo"
+      subject.expand_path('/foo', "//bar").must_equal "//bar/foo"
+      subject.expand_path('//foo', "/bar").must_equal "//foo"
+    end
+
     it "converts a dot with UNC dir" do
       subject.expand_path('.', "//").must_equal "//"
     end
