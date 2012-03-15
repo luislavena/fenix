@@ -121,6 +121,26 @@ describe Fenix::File do
       subject.expand_path('/foo').must_match %r"\A#{drive}/foo\z"i
     end
 
+    it "returns tainted strings or not" do
+      subject.expand_path('foo').tainted?.must_equal true
+      subject.expand_path('foo'.taint).tainted?.must_equal true
+      subject.expand_path('/foo'.taint).tainted?.must_equal true
+      subject.expand_path('C:/foo'.taint).tainted?.must_equal true
+      subject.expand_path('/foo').tainted?.must_equal true
+      subject.expand_path('C:/foo').tainted?.must_equal false
+      subject.expand_path('//foo').tainted?.must_equal false
+      subject.expand_path('foo', 'bar').tainted?.must_equal true
+      subject.expand_path('foo', '/bar'.taint).tainted?.must_equal true
+      subject.expand_path('foo', 'C:/bar'.taint).tainted?.must_equal true
+      subject.expand_path('foo'.taint, '/bar').tainted?.must_equal true
+      subject.expand_path('foo'.taint, 'C:/bar').tainted?.must_equal true
+      subject.expand_path('foo', '/bar').tainted?.must_equal true
+      subject.expand_path('foo', 'C:/bar').tainted?.must_equal false
+      subject.expand_path('foo', '//bar').tainted?.must_equal false
+      subject.expand_path('~').tainted?.must_equal true
+      subject.expand_path('C:/foo/../bar').tainted?.must_equal false
+    end
+
     describe "~/" do
       let(:home) { "C:/UserHome" }
       let(:home_drive) { nil }
