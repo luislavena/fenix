@@ -445,11 +445,12 @@ fenix_file_expand_path(int argc, VALUE *argv)
 			free(wpath);
 			rb_raise(rb_eArgError, "couldn't find HOME environment -- expanding `~'");
 		}
-		if (PathIsRelativeW(whome)) {
+		whome_len = wcslen(whome);
+
+		if (PathIsRelativeW(whome) && !(whome_len >= 2 && IS_DIR_UNC_P(whome))) {
 			free(wpath);
 			rb_raise(rb_eArgError, "non-absolute home");
 		}
-		whome_len = wcslen(whome);
 
 		// wprintf(L"whome: '%s' with (%i) characters long.\n", whome, whome_len);
 

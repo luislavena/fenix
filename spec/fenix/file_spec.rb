@@ -143,6 +143,7 @@ describe Fenix::File do
 
     describe "~/" do
       let(:home) { "C:/UserHome" }
+      let(:unc_home) { "//UserHome" }
       let(:home_drive) { nil }
       let(:home_path) { nil }
       let(:user_profile) { nil }
@@ -169,6 +170,11 @@ describe Fenix::File do
         subject.expand_path("~").must_equal home
         subject.expand_path("~", "C:/FooBar").must_equal home
         subject.expand_path("~/a", "C:/FooBar").must_equal File.join(home, "a")
+      end
+
+      it "converts a pathname to an absolute pathname, using ~ (unc_home)" do
+        ENV["HOME"] = unc_home
+        subject.expand_path("~").must_equal unc_home
       end
 
       it "does not modify a HOME string argument" do
