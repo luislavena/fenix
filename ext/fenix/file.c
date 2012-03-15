@@ -408,9 +408,13 @@ fenix_file_expand_path(int argc, VALUE *argv)
 	wchar_t path_drive = L'\0', dir_drive = L'\0';
 	int ignore_dir = 0;
 	rb_encoding *path_encoding;
+	int tainted = 0;
 
 	// retrieve path and dir from argv
 	rb_scan_args(argc, argv, "11", &path, &dir);
+
+	/* tainted if path is tainted */
+	tainted = OBJ_TAINTED(path);
 
 	// get path encoding
 	if (NIL_P(dir)) {
@@ -432,17 +436,21 @@ fenix_file_expand_path(int argc, VALUE *argv)
 	/* determine if we need the user's home directory */
 	if ((wpath_len == 1 && wpath_pos[0] == L'~') ||
 		(wpath_len >= 2 && wpath_pos[0] == L'~' && IS_DIR_SEPARATOR_P(wpath_pos[1]))) {
+		/* tainted if expanding '~' */
+		tainted = 1;
+
 		// wprintf(L"wpath requires expansion.\n");
 		whome = fenix_home_dir();
 		if (whome == NULL) {
 			free(wpath);
 			rb_raise(rb_eArgError, "couldn't find HOME environment -- expanding `~'");
 		}
-		if (PathIsRelativeW(whome)) {
+		whome_len = wcslen(whome);
+
+		if (PathIsRelativeW(whome) && !(whome_len >= 2 && IS_DIR_UNC_P(whome))) {
 			free(wpath);
 			rb_raise(rb_eArgError, "non-absolute home");
 		}
-		whome_len = wcslen(whome);
 
 		// wprintf(L"whome: '%s' with (%i) characters long.\n", whome, whome_len);
 
@@ -472,6 +480,9 @@ fenix_file_expand_path(int argc, VALUE *argv)
 		wchar_t *wuser = wpath_pos + 1;
 		wchar_t *pos = wuser;
 		char *user;
+
+		/* tainted if expanding '~' */
+		tainted = 1;
 
 		while (!IS_DIR_SEPARATOR_P(*pos) && *pos != '\0')
 			pos++;
@@ -539,6 +550,17 @@ fenix_file_expand_path(int argc, VALUE *argv)
 		}
 	}
 
+	if (!ignore_dir && wpath_len >= 2 && IS_DIR_UNC_P(wpath)) {
+		/* ignore dir since path has UNC root */
+		ignore_dir = 1;
+		wdir_len = 0;
+	} else if (!ignore_dir && wpath_len >= 1 && IS_DIR_SEPARATOR_P(wpath[0]) &&
+		!dir_drive && !(wdir_len >= 2 && IS_DIR_UNC_P(wdir))) {
+		/* ignore dir since path has root slash and dir doesn't have drive or UNC root */
+		ignore_dir = 1;
+		wdir_len = 0;
+	}
+
 	// wprintf(L"wpath_len: %i\n", wpath_len);
 	// wprintf(L"wdir_len: %i\n", wdir_len);
 	// wprintf(L"whome_len: %i\n", whome_len);
@@ -563,6 +585,10 @@ fenix_file_expand_path(int argc, VALUE *argv)
 	}
 
 	if (wdir_len) {
+		/* tainted if dir is used and dir is tainted */
+		if (!tainted && OBJ_TAINTED(dir))
+			tainted = 1;
+
 		// wprintf(L"Copying wdir...\n");
 		wcsncpy(buffer_pos, wdir, wdir_len);
 		buffer_pos += wdir_len;
@@ -591,6 +617,12 @@ fenix_file_expand_path(int argc, VALUE *argv)
 
 	/* Ensure buffer is NULL terminated */
 	buffer_pos[0] = L'\0';
+
+
+	/* tainted if path is relative */
+	if (!tainted && PathIsRelativeW(buffer) && !(buffer_len >= 2 && IS_DIR_UNC_P(buffer))) {
+	    tainted = 1;
+	}
 
 	// wprintf(L"buffer: '%s'\n", buffer);
 
@@ -645,6 +677,10 @@ fenix_file_expand_path(int argc, VALUE *argv)
 
 		/* convert to VALUE and set the path encoding */
 		result = rb_enc_str_new(fullpath, size - 1, path_encoding);
+
+		/* makes the result object tainted if expanding tainted strings or returning modified path */
+		if (tainted)
+			OBJ_TAINT(result);
 	}
 
 	// TODO: better cleanup

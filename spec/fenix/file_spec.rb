@@ -91,6 +91,18 @@ describe Fenix::File do
       subject.expand_path('/foo', "z:/bar").must_match %r"\Az:/foo\z"i
     end
 
+    it "converts a pathname which starts with a slash ignoring dir" do
+      # This spec is from TestPathname#test_expand_path of test/pathname/test_pathname.rb
+      subject.expand_path('/foo', "/bar").must_match %r"\Ac:/foo\z"i
+      subject.expand_path('/foo', "bar").must_match %r"\Ac:/foo\z"i
+    end
+
+    it "converts a pathname which starts with a slash and UNC pathname" do
+      subject.expand_path('//foo', "//bar").must_equal "//foo"
+      subject.expand_path('/foo', "//bar").must_equal "//bar/foo"
+      subject.expand_path('//foo', "/bar").must_equal "//foo"
+    end
+
     it "converts a dot with UNC dir" do
       subject.expand_path('.', "//").must_equal "//"
     end
@@ -109,8 +121,29 @@ describe Fenix::File do
       subject.expand_path('/foo').must_match %r"\A#{drive}/foo\z"i
     end
 
+    it "returns tainted strings or not" do
+      subject.expand_path('foo').tainted?.must_equal true
+      subject.expand_path('foo'.taint).tainted?.must_equal true
+      subject.expand_path('/foo'.taint).tainted?.must_equal true
+      subject.expand_path('C:/foo'.taint).tainted?.must_equal true
+      subject.expand_path('/foo').tainted?.must_equal true
+      subject.expand_path('C:/foo').tainted?.must_equal false
+      subject.expand_path('//foo').tainted?.must_equal false
+      subject.expand_path('foo', 'bar').tainted?.must_equal true
+      subject.expand_path('foo', '/bar'.taint).tainted?.must_equal true
+      subject.expand_path('foo', 'C:/bar'.taint).tainted?.must_equal true
+      subject.expand_path('foo'.taint, '/bar').tainted?.must_equal true
+      subject.expand_path('foo'.taint, 'C:/bar').tainted?.must_equal true
+      subject.expand_path('foo', '/bar').tainted?.must_equal true
+      subject.expand_path('foo', 'C:/bar').tainted?.must_equal false
+      subject.expand_path('foo', '//bar').tainted?.must_equal false
+      subject.expand_path('~').tainted?.must_equal true
+      subject.expand_path('C:/foo/../bar').tainted?.must_equal false
+    end
+
     describe "~/" do
       let(:home) { "C:/UserHome" }
+      let(:unc_home) { "//UserHome" }
       let(:home_drive) { nil }
       let(:home_path) { nil }
       let(:user_profile) { nil }
@@ -137,6 +170,11 @@ describe Fenix::File do
         subject.expand_path("~").must_equal home
         subject.expand_path("~", "C:/FooBar").must_equal home
         subject.expand_path("~/a", "C:/FooBar").must_equal File.join(home, "a")
+      end
+
+      it "converts a pathname to an absolute pathname, using ~ (unc_home)" do
+        ENV["HOME"] = unc_home
+        subject.expand_path("~").must_equal unc_home
       end
 
       it "does not modify a HOME string argument" do
