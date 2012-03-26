@@ -1,5 +1,8 @@
 #include "fenix.h"
 
+#define malloc xmalloc
+#define free xfree
+
 static inline void
 fenix_replace_wchar(wchar_t *s, int find, int replace)
 {
