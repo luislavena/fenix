@@ -451,6 +451,8 @@ fenix_file_expand_path(int argc, VALUE *argv)
 	int ignore_dir = 0;
 	rb_encoding *path_encoding;
 	int tainted = 0;
+	// prepare for rb_file_absolute_path()
+	int abs_mode = 0;
 
 	// retrieve path and dir from argv
 	rb_scan_args(argc, argv, "11", &path, &dir);
@@ -476,8 +478,9 @@ fenix_file_expand_path(int argc, VALUE *argv)
 	// wprintf(L"wpath: '%s' with (%i) characters long.\n", wpath, wpath_len);
 
 	/* determine if we need the user's home directory */
-	if ((wpath_len == 1 && wpath_pos[0] == L'~') ||
-		(wpath_len >= 2 && wpath_pos[0] == L'~' && IS_DIR_SEPARATOR_P(wpath_pos[1]))) {
+	/* expand '~' only if NOT rb_file_absolute_path() where `abs_mode` is 1 */
+	if (abs_mode == 0 && ((wpath_len == 1 && wpath_pos[0] == L'~') ||
+		(wpath_len >= 2 && wpath_pos[0] == L'~' && IS_DIR_SEPARATOR_P(wpath_pos[1])))) {
 		/* tainted if expanding '~' */
 		tainted = 1;
 
@@ -518,7 +521,7 @@ fenix_file_expand_path(int argc, VALUE *argv)
 			/* determine if we ignore dir or not later */
 			path_drive = wpath_pos[0];
 		}
-	} else if (wpath_len >= 2 && wpath_pos[0] == L'~') {
+	} else if (abs_mode == 0 && wpath_len >= 2 && wpath_pos[0] == L'~') {
 		wchar_t *wuser = wpath_pos + 1;
 		wchar_t *pos = wuser;
 		char *user;
