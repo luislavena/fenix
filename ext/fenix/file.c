@@ -78,18 +78,57 @@ fenix_home_dir()
 	return NULL;
 }
 
+#define insecure_obj_p(obj, level) ((level) >= 4 || ((level) > 0 && OBJ_TAINTED(obj)))
+
+static VALUE
+file_path_convert(VALUE name)
+{
+#ifndef _WIN32 /* non Windows == Unix */
+    rb_encoding *fname_encoding = rb_enc_from_index(ENCODING_GET(name));
+    rb_encoding *fs_encoding;
+    if (rb_default_internal_encoding() != NULL
+	    && rb_usascii_encoding() != fname_encoding
+	    && rb_ascii8bit_encoding() != fname_encoding
+	    && (fs_encoding = rb_filesystem_encoding()) != fname_encoding
+	    && !rb_enc_str_asciionly_p(name)) {
+	/* Don't call rb_filesystem_encoding() before US-ASCII and ASCII-8BIT */
+	/* fs_encoding should be ascii compatible */
+	name = rb_str_conv_enc(name, fname_encoding, fs_encoding);
+    }
+#endif
+    return name;
+}
+
 static VALUE
 fenix_coerce_to_path(VALUE obj)
 {
 	VALUE tmp;
 	ID to_path;
+	rb_encoding *enc;
+	int level = rb_safe_level();
+
+	if (insecure_obj_p(obj, level)) {
+		rb_insecure_operation();
+	}
 
 	CONST_ID(to_path, "to_path");
 	tmp = rb_check_funcall(obj, to_path, 0, 0);
 	if (tmp == Qundef)
 		tmp = obj;
 
-	return StringValue(tmp);
+	StringValue(tmp);
+
+	tmp = file_path_convert(tmp);
+	if (obj != tmp && insecure_obj_p(tmp, level)) {
+		rb_insecure_operation();
+	}
+	enc = rb_enc_get(tmp);
+	if (!rb_enc_asciicompat(enc)) {
+		tmp = rb_str_inspect(tmp);
+		rb_raise(rb_eEncCompatError, "path name must be ASCII-compatible (%s): %s",
+			 rb_enc_name(enc), RSTRING_PTR(tmp));
+	}
+	return rb_str_new4(tmp);
 }
 
 // TODO: can we fail allocating memory?
