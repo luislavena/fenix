@@ -12,12 +12,18 @@ Rake::TestTask.new(:spec) do |t|
   t.pattern = "spec/**/*_spec.rb"
 end
 
+Rake::TestTask.new do |t|
+  t.libs << "test"
+  t.pattern = "test/**/test_*.rb"
+end
+
 Rake::ExtensionTask.new("fenix") do |ext|
   ext.config_options << "--enable-debug"
 end
 
 # compile before running specs
 task :spec => [:compile]
+task :test => [:compile]
 
 desc "Execute benchmarks"
 task :bench => [:spec] do
