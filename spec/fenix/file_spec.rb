@@ -284,6 +284,14 @@ describe Fenix::File do
           subject.expand_path(a.dup.force_encoding(cp)).must_equal expected.force_encoding(cp), cp
         end
       end
+
+      it "expands with encoding" do
+        path = "\u3042\u3044\u3046\u3048\u304a".encode("EUC-JP")
+        subject.expand_path(path).encode("CP932").must_equal "#{Dir.pwd}/#{path}".encode("CP932")
+
+        path = "\u3042\u3044\u3046\u3048\u304a".encode("CP51932")
+        subject.expand_path(path).must_equal "#{Dir.pwd}/#{path}"
+      end
     end
   end
 

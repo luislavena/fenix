@@ -1,5 +1,8 @@
 #include "fenix.h"
 
+/* MultiByteToWideChar() doesn't work with code page 51932 */
+#define INVALID_CODE_PAGE 51932
+
 #define malloc xmalloc
 #define free xfree
 
@@ -398,16 +401,11 @@ fenix_code_page(rb_encoding *enc)
 	fake_str.as.heap.aux.capa = fake_str.as.heap.len;
 	name_key = (VALUE)&fake_str;
 	ENCODING_CODERANGE_SET(name_key, rb_usascii_encindex(), ENC_CODERANGE_7BIT);
-	OBJ_FREEZE(name_key);
 
 	code_page_value = rb_hash_lookup(rb_code_page, name_key);
 	if (code_page_value != Qnil) {
 		// printf("cached code page: %i\n", FIX2INT(code_page_value));
-		if (FIX2INT(code_page_value) == -1) {
-			return system_code_page();
-		} else {
-			return (UINT)FIX2INT(code_page_value);
-		}
+		return (UINT)FIX2INT(code_page_value);
 	}
 
 	name_key = rb_usascii_str_new2(enc_name);
@@ -418,19 +416,32 @@ fenix_code_page(rb_encoding *enc)
 		names_ary = rb_funcall(encoding, names, 0);
 	}
 
+	if (enc == rb_usascii_encoding()) {
+		UINT code_page = 20127;
+		rb_hash_aset(rb_code_page, name_key, INT2FIX(code_page));
+		return code_page;
+	}
+	else if (enc == rb_ascii8bit_encoding()) {
+		UINT code_page = 437;
+		rb_hash_aset(rb_code_page, name_key, INT2FIX(code_page));
+		return code_page;
+	}
+
 	if (names_ary != Qundef) {
 		for (i = 0; i < RARRAY_LEN(names_ary); i++) {
 			name = RARRAY_PTR(names_ary)[i];
 			if (strncmp("CP", RSTRING_PTR(name), 2) == 0) {
 				int code_page = atoi(RSTRING_PTR(name) + 2);
-				rb_hash_aset(rb_code_page, name_key, INT2FIX(code_page));
-				return (UINT)code_page;
+				if (code_page != 0) {
+					rb_hash_aset(rb_code_page, name_key, INT2FIX(code_page));
+					return (UINT)code_page;
+				}
 			}
 		}
 	}
 
-	rb_hash_aset(rb_code_page, name_key, INT2FIX(-1));
-	return system_code_page();
+	rb_hash_aset(rb_code_page, name_key, INT2FIX(INVALID_CODE_PAGE));
+	return INVALID_CODE_PAGE;
 }
 
 #define PATH_BUFFER_SIZE MAX_PATH * 2
@@ -444,7 +455,7 @@ fenix_file_expand_path(int argc, VALUE *argv)
 	char *fullpath = NULL;
 	wchar_t *wfullpath = NULL, *wpath = NULL, *wpath_pos = NULL, *wdir = NULL;
 	wchar_t *whome = NULL, *buffer = NULL, *buffer_pos = NULL;
-	UINT cp;
+	UINT path_cp, cp;
 	VALUE result = Qnil, path = Qnil, dir = Qnil;
 	wchar_t wfullpath_buffer[PATH_BUFFER_SIZE];
 	wchar_t path_drive = L'\0', dir_drive = L'\0';
@@ -466,7 +477,8 @@ fenix_file_expand_path(int argc, VALUE *argv)
 	} else {
 		path_encoding = rb_enc_check(path, dir);
 	}
-	cp = fenix_code_page(path_encoding);
+
+	cp = path_cp = fenix_code_page(path_encoding);
 	// printf("code page: %i\n", cp);
 
 	// coerce them to string
@@ -474,6 +486,14 @@ fenix_file_expand_path(int argc, VALUE *argv)
 
 	// convert char * to wchar_t
 	// path
+	if (path_cp == INVALID_CODE_PAGE) {
+		cp = CP_UTF8;
+		if (!NIL_P(path)) {
+			VALUE tmp = rb_enc_str_new(RSTRING_PTR(path), RSTRING_LEN(path), path_encoding);
+			path = rb_str_encode(tmp, rb_enc_from_encoding(rb_utf8_encoding()), 0, Qnil);
+			rb_str_resize(tmp, 0);
+		}
+	}
 	fenix_path_to_wchar(path, &wpath, &wpath_pos, &wpath_len, cp);
 	// wprintf(L"wpath: '%s' with (%i) characters long.\n", wpath, wpath_len);
 
@@ -538,7 +558,13 @@ fenix_file_expand_path(int argc, VALUE *argv)
 		WideCharToMultiByte(cp, 0, wuser, -1, user, size, NULL, NULL);
 
 		/* convert to VALUE and set the path encoding */
-		result = rb_enc_str_new(user, size - 1, path_encoding);
+		if (path_cp == INVALID_CODE_PAGE) {
+			VALUE tmp = rb_enc_str_new(user, size - 1, rb_utf8_encoding());
+			result = rb_str_encode(tmp, rb_enc_from_encoding(path_encoding), 0, Qnil);
+			rb_str_resize(tmp, 0);
+		} else {
+			result = rb_enc_str_new(user, size - 1, path_encoding);
+		}
 
 		free(wpath);
 		if (user)
@@ -554,6 +580,11 @@ fenix_file_expand_path(int argc, VALUE *argv)
 
 		// convert char * to wchar_t
 		// dir
+		if (path_cp == INVALID_CODE_PAGE) {
+			VALUE tmp = rb_enc_str_new(RSTRING_PTR(dir), RSTRING_LEN(dir), path_encoding);
+			dir = rb_str_encode(tmp, rb_enc_from_encoding(rb_utf8_encoding()), 0, Qnil);
+			rb_str_resize(tmp, 0);
+		}
 		fenix_path_to_wchar(dir, &wdir, NULL, &wdir_len, cp);
 		// wprintf(L"wdir: '%s' with (%i) characters long.\n", wdir, wdir_len);
 
@@ -722,6 +753,22 @@ fenix_file_expand_path(int argc, VALUE *argv)
 
 		/* convert to VALUE and set the path encoding */
 		result = rb_enc_str_new(fullpath, size - 1, path_encoding);
+
+		if (path_cp == INVALID_CODE_PAGE) {
+			VALUE tmp;
+			size_t len;
+
+			rb_enc_associate(result, rb_utf8_encoding());
+			ENC_CODERANGE_CLEAR(result);
+			tmp = rb_str_encode(result, rb_enc_from_encoding(path_encoding), 0, Qnil);
+			len = RSTRING_LEN(tmp);
+			rb_str_modify(result);
+			rb_str_resize(result, len);
+			memcpy(RSTRING_PTR(result), RSTRING_PTR(tmp), len);
+			rb_str_resize(tmp, 0);
+		}
+		rb_enc_associate(result, path_encoding);
+		ENC_CODERANGE_CLEAR(result);
 
 		/* makes the result object tainted if expanding tainted strings or returning modified path */
 		if (tainted)
