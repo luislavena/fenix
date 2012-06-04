@@ -90,19 +90,19 @@ static VALUE
 file_path_convert(VALUE name)
 {
 #ifndef _WIN32 /* non Windows == Unix */
-    rb_encoding *fname_encoding = rb_enc_from_index(ENCODING_GET(name));
-    rb_encoding *fs_encoding;
-    if (rb_default_internal_encoding() != NULL
-	    && rb_usascii_encoding() != fname_encoding
-	    && rb_ascii8bit_encoding() != fname_encoding
-	    && (fs_encoding = rb_filesystem_encoding()) != fname_encoding
-	    && !rb_enc_str_asciionly_p(name)) {
-	/* Don't call rb_filesystem_encoding() before US-ASCII and ASCII-8BIT */
-	/* fs_encoding should be ascii compatible */
-	name = rb_str_conv_enc(name, fname_encoding, fs_encoding);
-    }
+	rb_encoding *fname_encoding = rb_enc_from_index(ENCODING_GET(name));
+	rb_encoding *fs_encoding;
+	if (rb_default_internal_encoding() != NULL
+		&& rb_usascii_encoding() != fname_encoding
+		&& rb_ascii8bit_encoding() != fname_encoding
+		&& (fs_encoding = rb_filesystem_encoding()) != fname_encoding
+		&& !rb_enc_str_asciionly_p(name)) {
+		/* Don't call rb_filesystem_encoding() before US-ASCII and ASCII-8BIT */
+		/* fs_encoding should be ascii compatible */
+		name = rb_str_conv_enc(name, fname_encoding, fs_encoding);
+	}
 #endif
-    return name;
+	return name;
 }
 
 static VALUE
@@ -353,7 +353,7 @@ fenix_remove_invalid_alternative_data(wchar_t *wfullpath, size_t size) {
 		/* remove trailing ':$DATA' of paths like '/aa:a:$DATA' */
 		wchar_t *pos = wfullpath + size - (prime_len + 1);
 		while (!IS_DIR_SEPARATOR_P(*pos) && pos != wfullpath) {
-			if (*pos ==  L':') {
+			if (*pos == L':') {
 				size -= prime_len; /* alternative */
 				wfullpath[size] = L'\0';
 				// wprintf(L"removed trailng ':$DATA': %s\n", wfullpath);
@@ -697,7 +697,7 @@ fenix_file_expand_path(int argc, VALUE *argv)
 
 	/* tainted if path is relative */
 	if (!tainted && PathIsRelativeW(buffer) && !(buffer_len >= 2 && IS_DIR_UNC_P(buffer))) {
-	    tainted = 1;
+		tainted = 1;
 	}
 
 	// wprintf(L"buffer: '%s'\n", buffer);
