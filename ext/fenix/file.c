@@ -28,6 +28,19 @@ fenix_mb_to_wchar(VALUE str, wchar_t **wstr, wchar_t **wstr_pos, size_t *wstr_le
 	*wstr_len = len - 2;
 }
 
+static inline void
+fenix_wchar_to_mb(const wchar_t *wstr, char **str, size_t *str_len, UINT code_page)
+{
+	size_t len;
+
+	len = WideCharToMultiByte(code_page, 0, wstr, -1, NULL, 0, NULL, NULL);
+	*str = (char *)xmalloc(len * sizeof(char));
+	WideCharToMultiByte(code_page, 0, wstr, -1, *str, len, NULL, NULL);
+
+	/* do not count terminator as part of the string length */
+	*str_len = len - 1;
+}
+
 /*
   Return user's home directory using environment variables combinations.
   Memory allocated by this function should be manually freeded afterwards.
@@ -358,17 +371,15 @@ fenix_file_expand_path_internal(VALUE path, VALUE dir, int abs_mode)
 			pos++;
 
 		*pos = '\0';
-		size = WideCharToMultiByte(cp, 0, wuser, -1, NULL, 0, NULL, NULL);
-		user = (char *)xmalloc(size * sizeof(char));
-		WideCharToMultiByte(cp, 0, wuser, -1, user, size, NULL, NULL);
+		fenix_wchar_to_mb(wuser, &user, &size, cp);
 
 		/* convert to VALUE and set the path encoding */
 		if (path_cp == INVALID_CODE_PAGE) {
-			VALUE tmp = rb_enc_str_new(user, size - 1, rb_utf8_encoding());
+			VALUE tmp = rb_enc_str_new(user, size, rb_utf8_encoding());
 			result = rb_str_encode(tmp, rb_enc_from_encoding(path_encoding), 0, Qnil);
 			rb_str_resize(tmp, 0);
 		} else {
-			result = rb_enc_str_new(user, size - 1, path_encoding);
+			result = rb_enc_str_new(user, size, path_encoding);
 		}
 
 		xfree(wpath);
@@ -527,16 +538,11 @@ fenix_file_expand_path_internal(VALUE path, VALUE dir, int abs_mode)
 		// sanitize backslashes with forwardslashes
 		fenix_replace_wchar(wfullpath, L'\\', L'/');
 
-		// What CodePage should we use?
-		// cp = AreFileApisANSI() ? CP_ACP : CP_OEMCP;
-
-		// convert to char *
-		size = WideCharToMultiByte(cp, 0, wfullpath, -1, NULL, 0, NULL, NULL);
-		fullpath = (char *)xmalloc(size * sizeof(char));
-		WideCharToMultiByte(cp, 0, wfullpath, -1, fullpath, size, NULL, NULL);
+		/* convert to char * */
+		fenix_wchar_to_mb(wfullpath, &fullpath, &size, cp);
 
 		/* convert to VALUE and set the path encoding */
-		result = rb_enc_str_new(fullpath, size - 1, path_encoding);
+		result = rb_enc_str_new(fullpath, size, path_encoding);
 
 		if (path_cp == INVALID_CODE_PAGE) {
 			VALUE tmp;
