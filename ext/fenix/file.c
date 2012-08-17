@@ -254,9 +254,8 @@ fenix_code_page(rb_encoding *enc)
 	return INVALID_CODE_PAGE;
 }
 
-// TODO: can we fail allocating memory?
 static VALUE
-fenix_file_expand_path(int argc, VALUE *argv)
+fenix_file_expand_path_internal(VALUE path, VALUE dir, int abs_mode)
 {
 	size_t size = 0, wpath_len = 0, wdir_len = 0, whome_len = 0;
 	size_t buffer_len = 0;
@@ -264,17 +263,12 @@ fenix_file_expand_path(int argc, VALUE *argv)
 	wchar_t *wfullpath = NULL, *wpath = NULL, *wpath_pos = NULL, *wdir = NULL;
 	wchar_t *whome = NULL, *buffer = NULL, *buffer_pos = NULL;
 	UINT path_cp, cp;
-	VALUE result = Qnil, path = Qnil, dir = Qnil;
+	VALUE result = Qnil;
 	wchar_t wfullpath_buffer[PATH_BUFFER_SIZE];
 	wchar_t path_drive = L'\0', dir_drive = L'\0';
 	int ignore_dir = 0;
 	rb_encoding *path_encoding;
 	int tainted = 0;
-	// prepare for rb_file_absolute_path()
-	int abs_mode = 0;
-
-	// retrieve path and dir from argv
-	rb_scan_args(argc, argv, "11", &path, &dir);
 
 	/* tainted if path is tainted */
 	tainted = OBJ_TAINTED(path);
@@ -577,6 +571,18 @@ fenix_file_expand_path(int argc, VALUE *argv)
 		xfree(fullpath);
 
 	return result;
+}
+
+// TODO: can we fail allocating memory?
+static VALUE
+fenix_file_expand_path(int argc, VALUE *argv)
+{
+	VALUE path = Qnil, dir = Qnil;
+
+	/* retrieve path and dir from argv */
+	rb_scan_args(argc, argv, "11", &path, &dir);
+
+	return fenix_file_expand_path_internal(path, dir, 0);
 }
 
 static VALUE
