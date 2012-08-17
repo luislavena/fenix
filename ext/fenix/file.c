@@ -10,22 +10,22 @@ fenix_replace_wchar(wchar_t *s, int find, int replace)
 	}
 }
 
-/* Convert the path from char to wchar with specified code page */
+/* Convert str from multibyte char to wchar with specified code page */
 static inline void
-fenix_path_to_wchar(VALUE path, wchar_t **wpath, wchar_t **wpath_pos, size_t *wpath_len, UINT code_page)
+fenix_mb_to_wchar(VALUE str, wchar_t **wstr, wchar_t **wstr_pos, size_t *wstr_len, UINT code_page)
 {
-	size_t size;
+	size_t len;
 
-	if (NIL_P(path))
+	if (NIL_P(str))
 		return;
 
-	size = MultiByteToWideChar(code_page, 0, RSTRING_PTR(path), -1, NULL, 0) + 1;
-	*wpath = (wchar_t *)xmalloc(size * sizeof(wchar_t));
-	if (wpath_pos)
-		*wpath_pos = *wpath;
+	len = MultiByteToWideChar(code_page, 0, RSTRING_PTR(str), -1, NULL, 0) + 1;
+	*wstr = (wchar_t *)xmalloc(len * sizeof(wchar_t));
+	if (wstr_pos)
+		*wstr_pos = *wstr;
 
-	MultiByteToWideChar(code_page, 0, RSTRING_PTR(path), -1, *wpath, size);
-	*wpath_len = size - 2; // wcslen(*wpath);
+	MultiByteToWideChar(code_page, 0, RSTRING_PTR(str), -1, *wstr, len);
+	*wstr_len = len - 2;
 }
 
 /*
@@ -273,7 +273,7 @@ fenix_file_expand_path_internal(VALUE path, VALUE dir, int abs_mode)
 	/* tainted if path is tainted */
 	tainted = OBJ_TAINTED(path);
 
-	// get path encoding
+	/* get path encoding */
 	if (NIL_P(dir)) {
 		path_encoding = rb_enc_get(path);
 	} else {
@@ -281,13 +281,11 @@ fenix_file_expand_path_internal(VALUE path, VALUE dir, int abs_mode)
 	}
 
 	cp = path_cp = fenix_code_page(path_encoding);
-	// printf("code page: %i\n", cp);
 
-	// coerce them to string
+	/* coerce path to string */
 	path = fenix_coerce_to_path(path);
 
-	// convert char * to wchar_t
-	// path
+	/* workaround invalid codepage */
 	if (path_cp == INVALID_CODE_PAGE) {
 		cp = CP_UTF8;
 		if (!NIL_P(path)) {
@@ -296,7 +294,9 @@ fenix_file_expand_path_internal(VALUE path, VALUE dir, int abs_mode)
 			rb_str_resize(tmp, 0);
 		}
 	}
-	fenix_path_to_wchar(path, &wpath, &wpath_pos, &wpath_len, cp);
+
+	/* convert char * to wchar_t */
+	fenix_mb_to_wchar(path, &wpath, &wpath_pos, &wpath_len, cp);
 
 	/* determine if we need the user's home directory */
 	/* expand '~' only if NOT rb_file_absolute_path() where `abs_mode` is 1 */
@@ -381,7 +381,7 @@ fenix_file_expand_path_internal(VALUE path, VALUE dir, int abs_mode)
 			dir = rb_str_encode(tmp, rb_enc_from_encoding(rb_utf8_encoding()), 0, Qnil);
 			rb_str_resize(tmp, 0);
 		}
-		fenix_path_to_wchar(dir, &wdir, NULL, &wdir_len, cp);
+		fenix_mb_to_wchar(dir, &wdir, NULL, &wdir_len, cp);
 
 		if (wdir_len >= 2 && wdir[1] == L':') {
 			dir_drive = wdir[0];
