@@ -34,6 +34,10 @@ fenix_path_to_wchar(VALUE path, wchar_t **wpath, wchar_t **wpath_pos, size_t *wp
 /*
   Return user's home directory using environment variables combinations.
   Memory allocated by this function should be manually freeded afterwards.
+
+  Try:
+  HOME, HOMEDRIVE + HOMEPATH and USERPROFILE environment variables
+  TODO: Special Folders - Profile and Personal
 */
 static wchar_t *
 fenix_home_dir()
@@ -41,10 +45,6 @@ fenix_home_dir()
 	wchar_t *buffer = NULL;
 	size_t buffer_len = 0, len = 0;
 	size_t home_env = 0;
-
-	// determine User's home directory trying:
-	// HOME, HOMEDRIVE + HOMEPATH and USERPROFILE environment variables
-	// TODO: Special Folders - Profile and Personal
 
 	/*
 	  GetEnvironmentVariableW when used with NULL will return the required
@@ -68,31 +68,32 @@ fenix_home_dir()
 		home_env = 3;
 	}
 
-	// allocate buffer
+	/* allocate buffer */
 	if (home_env)
 		buffer = (wchar_t *)xmalloc(buffer_len * sizeof(wchar_t));
 
 	switch (home_env) {
-		case 1: // HOME
+		case 1:
+			/* HOME */
 			GetEnvironmentVariableW(L"HOME", buffer, buffer_len);
 			break;
-		case 2: // HOMEDRIVE + HOMEPATH
+		case 2:
+			/* HOMEDRIVE + HOMEPATH */
 			len = GetEnvironmentVariableW(L"HOMEDRIVE", buffer, buffer_len);
 			GetEnvironmentVariableW(L"HOMEPATH", buffer + len, buffer_len - len);
 			break;
-		case 3: // USERPROFILE
+		case 3:
+			/* USERPROFILE */
 			GetEnvironmentVariableW(L"USERPROFILE", buffer, buffer_len);
 			break;
 		default:
-			// wprintf(L"Failed to determine user home directory.\n");
 			break;
 	}
 
 	if (home_env) {
-		// sanitize backslashes with forwardslashes
+		/* sanitize backslashes with forwardslashes */
 		fenix_replace_wchar(buffer, L'\\', L'/');
 
-		// wprintf(L"home dir: '%s' using home_env (%i)\n", buffer, home_env);
 		return buffer;
 	}
 
