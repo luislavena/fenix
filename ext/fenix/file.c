@@ -187,9 +187,6 @@ system_code_page() {
 	return AreFileApisANSI() ? CP_ACP : CP_OEMCP;
 }
 
-/* cache 'encoding name' => 'code page' into a hash */
-static VALUE rb_code_page;
-
 /*
   Return code page number of the encoding.
   Cache code page into a hash for performance since finding the code page in
