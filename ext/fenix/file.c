@@ -13,6 +13,24 @@ fenix_replace_wchar(wchar_t *s, int find, int replace)
 	}
 }
 
+/* Convert the path from char to wchar with specified code page */
+static inline void
+fenix_path_to_wchar(VALUE path, wchar_t **wpath, wchar_t **wpath_pos, size_t *wpath_len, UINT code_page)
+{
+	size_t size;
+
+	if (NIL_P(path))
+		return;
+
+	size = MultiByteToWideChar(code_page, 0, RSTRING_PTR(path), -1, NULL, 0) + 1;
+	*wpath = (wchar_t *)xmalloc(size * sizeof(wchar_t));
+	if (wpath_pos)
+		*wpath_pos = *wpath;
+
+	MultiByteToWideChar(code_page, 0, RSTRING_PTR(path), -1, *wpath, size);
+	*wpath_len = size - 2; // wcslen(*wpath);
+}
+
 /*
   Return user's home directory using environment variables combinations.
   Memory allocated by this function should be manually freeded afterwards.
@@ -132,24 +150,6 @@ fenix_coerce_to_path(VALUE obj)
 			 rb_enc_name(enc), RSTRING_PTR(tmp));
 	}
 	return rb_str_new4(tmp);
-}
-
-/* Convert the path from char to wchar with specified code page */
-static inline void
-fenix_path_to_wchar(VALUE path, wchar_t **wpath, wchar_t **wpath_pos, size_t *wpath_len, UINT code_page)
-{
-	size_t size;
-
-	if (NIL_P(path))
-		return;
-
-	size = MultiByteToWideChar(code_page, 0, RSTRING_PTR(path), -1, NULL, 0) + 1;
-	*wpath = (wchar_t *)xmalloc(size * sizeof(wchar_t));
-	if (wpath_pos)
-		*wpath_pos = *wpath;
-
-	MultiByteToWideChar(code_page, 0, RSTRING_PTR(path), -1, *wpath, size);
-	*wpath_len = size - 2; // wcslen(*wpath);
 }
 
 /* Remove trailing invalid ':$DATA' of the path. */
