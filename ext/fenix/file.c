@@ -1,8 +1,5 @@
 #include "fenix.h"
 
-/* MultiByteToWideChar() doesn't work with code page 51932 */
-#define INVALID_CODE_PAGE 51932
-
 static inline void
 fenix_replace_wchar(wchar_t *s, int find, int replace)
 {
@@ -99,8 +96,6 @@ fenix_home_dir()
 
 	return NULL;
 }
-
-#define insecure_obj_p(obj, level) ((level) >= 4 || ((level) > 0 && OBJ_TAINTED(obj)))
 
 static VALUE
 file_path_convert(VALUE name)
@@ -264,8 +259,6 @@ fenix_code_page(rb_encoding *enc)
 	rb_hash_aset(rb_code_page, name_key, INT2FIX(INVALID_CODE_PAGE));
 	return INVALID_CODE_PAGE;
 }
-
-#define PATH_BUFFER_SIZE MAX_PATH * 2
 
 // TODO: can we fail allocating memory?
 static VALUE
