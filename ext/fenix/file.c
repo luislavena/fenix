@@ -254,6 +254,17 @@ fenix_code_page(rb_encoding *enc)
 	return INVALID_CODE_PAGE;
 }
 
+static inline VALUE
+fenix_fix_string_encoding(VALUE str, rb_encoding *encoding)
+{
+	VALUE result, tmp;
+
+	tmp = rb_enc_str_new(RSTRING_PTR(str), RSTRING_LEN(str), encoding);
+	result = rb_str_encode(tmp, rb_enc_from_encoding(rb_utf8_encoding()), 0, Qnil);
+
+	return result;
+}
+
 static VALUE
 fenix_file_expand_path_internal(VALUE path, VALUE dir, int abs_mode)
 {
@@ -289,9 +300,7 @@ fenix_file_expand_path_internal(VALUE path, VALUE dir, int abs_mode)
 	if (path_cp == INVALID_CODE_PAGE) {
 		cp = CP_UTF8;
 		if (!NIL_P(path)) {
-			VALUE tmp = rb_enc_str_new(RSTRING_PTR(path), RSTRING_LEN(path), path_encoding);
-			path = rb_str_encode(tmp, rb_enc_from_encoding(rb_utf8_encoding()), 0, Qnil);
-			rb_str_resize(tmp, 0);
+			path = fenix_fix_string_encoding(path, path_encoding);
 		}
 	}
 
@@ -374,13 +383,12 @@ fenix_file_expand_path_internal(VALUE path, VALUE dir, int abs_mode)
 		// coerce them to string
 		dir = fenix_coerce_to_path(dir);
 
-		// convert char * to wchar_t
-		// dir
+		/* fix string encoding */
 		if (path_cp == INVALID_CODE_PAGE) {
-			VALUE tmp = rb_enc_str_new(RSTRING_PTR(dir), RSTRING_LEN(dir), path_encoding);
-			dir = rb_str_encode(tmp, rb_enc_from_encoding(rb_utf8_encoding()), 0, Qnil);
-			rb_str_resize(tmp, 0);
+			dir = fenix_fix_string_encoding(dir, path_encoding);
 		}
+
+		/* convert char * to wchar_t */
 		fenix_mb_to_wchar(dir, &wdir, NULL, &wdir_len, cp);
 
 		if (wdir_len >= 2 && wdir[1] == L':') {
