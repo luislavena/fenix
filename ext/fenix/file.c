@@ -535,7 +535,7 @@ fenix_file_expand_path_internal(VALUE path, VALUE dir, int abs_mode)
 		/* removes trailing invalid ':$DATA' */
 		size = fenix_remove_invalid_alternative_data(wfullpath, size);
 
-		// sanitize backslashes with forwardslashes
+		/* sanitize backslashes with forwardslashes */
 		fenix_replace_wchar(wfullpath, L'\\', L'/');
 
 		/* convert to char * */
@@ -565,7 +565,7 @@ fenix_file_expand_path_internal(VALUE path, VALUE dir, int abs_mode)
 			OBJ_TAINT(result);
 	}
 
-	// TODO: better cleanup
+	/* TODO: better cleanup */
 	if (buffer)
 		xfree(buffer);
 
@@ -587,7 +587,6 @@ fenix_file_expand_path_internal(VALUE path, VALUE dir, int abs_mode)
 	return result;
 }
 
-// TODO: can we fail allocating memory?
 static VALUE
 fenix_file_expand_path(int argc, VALUE *argv)
 {
@@ -596,6 +595,7 @@ fenix_file_expand_path(int argc, VALUE *argv)
 	/* retrieve path and dir from argv */
 	rb_scan_args(argc, argv, "11", &path, &dir);
 
+	/* reuse fenix_file_expand_path_internal without absolute enabled */
 	return fenix_file_expand_path_internal(path, dir, 0);
 }
 
