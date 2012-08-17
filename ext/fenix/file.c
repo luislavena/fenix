@@ -3,9 +3,6 @@
 /* MultiByteToWideChar() doesn't work with code page 51932 */
 #define INVALID_CODE_PAGE 51932
 
-#define malloc xmalloc
-#define free xfree
-
 static inline void
 fenix_replace_wchar(wchar_t *s, int find, int replace)
 {
@@ -55,7 +52,7 @@ fenix_home_dir()
 
 	// allocate buffer
 	if (home_env)
-		buffer = (wchar_t *)malloc(buffer_len * sizeof(wchar_t));
+		buffer = (wchar_t *)xmalloc(buffer_len * sizeof(wchar_t));
 
 	switch (home_env) {
 		case 1: // HOME
@@ -161,7 +158,7 @@ fenix_file_expand_path_plain(int argc, VALUE *argv)
 	// path
 	if (!NIL_P(path)) {
 		size = MultiByteToWideChar(CP_UTF8, 0, RSTRING_PTR(path), -1, NULL, 0) + 1;
-		wpath = wpath_pos = (wchar_t *)malloc(size * sizeof(wchar_t));
+		wpath = wpath_pos = (wchar_t *)xmalloc(size * sizeof(wchar_t));
 		MultiByteToWideChar(CP_UTF8, 0, RSTRING_PTR(path), -1, wpath, size);
 		wpath_len = wcslen(wpath);
 		// wprintf(L"wpath: '%s' with (%i) characters long.\n", wpath, wpath_len);
@@ -170,7 +167,7 @@ fenix_file_expand_path_plain(int argc, VALUE *argv)
 	// dir
 	if (!NIL_P(dir)) {
 		size = MultiByteToWideChar(CP_UTF8, 0, RSTRING_PTR(dir), -1, NULL, 0) + 1;
-		wdir = (wchar_t *)malloc(size * sizeof(wchar_t));
+		wdir = (wchar_t *)xmalloc(size * sizeof(wchar_t));
 		MultiByteToWideChar(CP_UTF8, 0, RSTRING_PTR(dir), -1, wdir, size);
 		wdir_len = wcslen(wdir);
 		// wprintf(L"wdir: '%s' with (%i) characters long.\n", wdir, wdir_len);
@@ -211,7 +208,7 @@ fenix_file_expand_path_plain(int argc, VALUE *argv)
 	buffer_len = wpath_len + 1 + wdir_len + 1 + whome_len + 1;
 	// wprintf(L"buffer_len: %i\n", buffer_len + 1);
 
-	buffer = buffer_pos = (wchar_t *)malloc((buffer_len + 1) * sizeof(wchar_t));
+	buffer = buffer_pos = (wchar_t *)xmalloc((buffer_len + 1) * sizeof(wchar_t));
 
 	/* add home */
 	if (whome_len) {
@@ -264,7 +261,7 @@ fenix_file_expand_path_plain(int argc, VALUE *argv)
 	size = GetFullPathNameW(buffer, 0, NULL, NULL);
 	if (size) {
 		// allocate enough memory to contain the response
-		wfullpath = (wchar_t *)malloc(size * sizeof(wchar_t));
+		wfullpath = (wchar_t *)xmalloc(size * sizeof(wchar_t));
 		GetFullPathNameW(buffer, size, wfullpath, NULL);
 
 		/* Calculate the new size and leave the garbage out */
@@ -285,7 +282,7 @@ fenix_file_expand_path_plain(int argc, VALUE *argv)
 
 		// convert to char *
 		size = WideCharToMultiByte(cp, 0, wfullpath, -1, NULL, 0, NULL, NULL) + 1;
-		fullpath = (char *)malloc(size * sizeof(char));
+		fullpath = (char *)xmalloc(size * sizeof(char));
 		WideCharToMultiByte(cp, 0, wfullpath, -1, fullpath, size, NULL, NULL);
 
 		// convert to VALUE and set the filesystem encoding
@@ -294,22 +291,22 @@ fenix_file_expand_path_plain(int argc, VALUE *argv)
 
 	// TODO: better cleanup
 	if (buffer)
-		free(buffer);
+		xfree(buffer);
 
 	if (wpath)
-		free(wpath);
+		xfree(wpath);
 
 	if (wdir)
-		free(wdir);
+		xfree(wdir);
 
 	if (whome)
-		free(whome);
+		xfree(whome);
 
 	if (wfullpath)
-		free(wfullpath);
+		xfree(wfullpath);
 
 	if (fullpath)
-		free(fullpath);
+		xfree(fullpath);
 
 	return result;
 }
@@ -324,7 +321,7 @@ fenix_path_to_wchar(VALUE path, wchar_t **wpath, wchar_t **wpath_pos, size_t *wp
 		return;
 
 	size = MultiByteToWideChar(code_page, 0, RSTRING_PTR(path), -1, NULL, 0) + 1;
-	*wpath = (wchar_t *)malloc(size * sizeof(wchar_t));
+	*wpath = (wchar_t *)xmalloc(size * sizeof(wchar_t));
 	if (wpath_pos)
 		*wpath_pos = *wpath;
 
@@ -507,13 +504,13 @@ fenix_file_expand_path(int argc, VALUE *argv)
 		// wprintf(L"wpath requires expansion.\n");
 		whome = fenix_home_dir();
 		if (whome == NULL) {
-			free(wpath);
+			xfree(wpath);
 			rb_raise(rb_eArgError, "couldn't find HOME environment -- expanding `~'");
 		}
 		whome_len = wcslen(whome);
 
 		if (PathIsRelativeW(whome) && !(whome_len >= 2 && IS_DIR_UNC_P(whome))) {
-			free(wpath);
+			xfree(wpath);
 			rb_raise(rb_eArgError, "non-absolute home");
 		}
 
@@ -554,7 +551,7 @@ fenix_file_expand_path(int argc, VALUE *argv)
 
 		*pos = '\0';
 		size = WideCharToMultiByte(cp, 0, wuser, -1, NULL, 0, NULL, NULL);
-		user = (char *)malloc(size * sizeof(char));
+		user = (char *)xmalloc(size * sizeof(char));
 		WideCharToMultiByte(cp, 0, wuser, -1, user, size, NULL, NULL);
 
 		/* convert to VALUE and set the path encoding */
@@ -566,9 +563,9 @@ fenix_file_expand_path(int argc, VALUE *argv)
 			result = rb_enc_str_new(user, size - 1, path_encoding);
 		}
 
-		free(wpath);
+		xfree(wpath);
 		if (user)
-			free(user);
+			xfree(user);
 
 		rb_raise(rb_eArgError, "can't find user %s", StringValuePtr(result));
 	}
@@ -644,7 +641,7 @@ fenix_file_expand_path(int argc, VALUE *argv)
 	buffer_len = wpath_len + 1 + wdir_len + 1 + whome_len + 1;
 	// wprintf(L"buffer_len: %i\n", buffer_len + 1);
 
-	buffer = buffer_pos = (wchar_t *)malloc((buffer_len + 1) * sizeof(wchar_t));
+	buffer = buffer_pos = (wchar_t *)xmalloc((buffer_len + 1) * sizeof(wchar_t));
 
 	/* add home */
 	if (whome_len) {
@@ -708,7 +705,7 @@ fenix_file_expand_path(int argc, VALUE *argv)
 	if (size) {
 		if (size > PATH_BUFFER_SIZE) {
 			// allocate enough memory to contain the response
-			wfullpath = (wchar_t *)malloc(size * sizeof(wchar_t));
+			wfullpath = (wchar_t *)xmalloc(size * sizeof(wchar_t));
 			size = GetFullPathNameW(buffer, size, wfullpath, NULL);
 		} else {
 			wfullpath = wfullpath_buffer;
@@ -748,7 +745,7 @@ fenix_file_expand_path(int argc, VALUE *argv)
 
 		// convert to char *
 		size = WideCharToMultiByte(cp, 0, wfullpath, -1, NULL, 0, NULL, NULL);
-		fullpath = (char *)malloc(size * sizeof(char));
+		fullpath = (char *)xmalloc(size * sizeof(char));
 		WideCharToMultiByte(cp, 0, wfullpath, -1, fullpath, size, NULL, NULL);
 
 		/* convert to VALUE and set the path encoding */
@@ -777,22 +774,22 @@ fenix_file_expand_path(int argc, VALUE *argv)
 
 	// TODO: better cleanup
 	if (buffer)
-		free(buffer);
+		xfree(buffer);
 
 	if (wpath)
-		free(wpath);
+		xfree(wpath);
 
 	if (wdir)
-		free(wdir);
+		xfree(wdir);
 
 	if (whome)
-		free(whome);
+		xfree(whome);
 
 	if (wfullpath && wfullpath != wfullpath_buffer)
-		free(wfullpath);
+		xfree(wfullpath);
 
 	if (fullpath)
-		free(fullpath);
+		xfree(fullpath);
 
 	return result;
 }
