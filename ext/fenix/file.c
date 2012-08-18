@@ -331,10 +331,10 @@ fenix_replace_to_long_name(wchar_t **wfullpath, size_t size, int heap) {
 		}
 		size = trail_pos + 1 + file_len;
 		if ((size + 1) > sizeof(*wfullpath) / sizeof((*wfullpath)[0])) {
-			wchar_t *buf = (wchar_t *)malloc((size + 1) * sizeof(wchar_t));
+			wchar_t *buf = (wchar_t *)xmalloc((size + 1) * sizeof(wchar_t));
 			wcsncpy(buf, *wfullpath, trail_pos + 1);
 			if (heap)
-				free(*wfullpath);
+				xfree(*wfullpath);
 			*wfullpath = buf;
 		}
 		wcsncpy(*wfullpath + trail_pos + 1, find_data.cFileName, file_len + 1);
