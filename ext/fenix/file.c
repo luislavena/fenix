@@ -278,8 +278,72 @@ fenix_fix_string_encoding(VALUE str, rb_encoding *encoding)
 	return result;
 }
 
+/*
+  Replace the last part of the path to long name.
+  We try to avoid to call FindFirstFileW() since it takes long time.
+*/
+static inline size_t
+fenix_replace_to_long_name(wchar_t **wfullpath, size_t size, int heap) {
+	WIN32_FIND_DATAW find_data;
+	HANDLE find_handle;
+
+	/*
+	  Skip long name conversion if the path is already long name.
+	  Short name is 8.3 format.
+	  http://en.wikipedia.org/wiki/8.3_filename
+	  This check can be skipped for directory components that have file
+	  extensions longer than 3 characters, or total lengths longer than
+	  12 characters.
+	  http://msdn.microsoft.com/en-us/library/windows/desktop/aa364980(v=vs.85).aspx
+	*/
+	size_t const max_short_name_size = 8 + 1 + 3;
+	size_t const max_extension_size = 3;
+	size_t path_len = 1, extension_len = 0;
+	wchar_t *pos = *wfullpath + size - 1;
+	while (!IS_DIR_SEPARATOR_P(*pos) && pos != *wfullpath) {
+		if (!extension_len && *pos == L'.') {
+			extension_len = path_len - 1;
+		}
+		if (path_len > max_short_name_size || extension_len > max_extension_size) {
+			return size;
+		}
+		path_len++;
+		pos--;
+	}
+
+	/*
+	  Avoid FindFirstFileW over non-existing path.
+	  GetFileAttributesW is faster to check if path doesn't exists.
+	*/
+	if (GetFileAttributesW(*wfullpath) == INVALID_FILE_ATTRIBUTES)
+		return size;
+
+	find_handle = FindFirstFileW(*wfullpath, &find_data);
+	if (find_handle != INVALID_HANDLE_VALUE) {
+		size_t trail_pos = wcslen(*wfullpath);
+		size_t file_len = wcslen(find_data.cFileName);
+
+		FindClose(find_handle);
+		while (trail_pos > 0) {
+			if (IS_DIR_SEPARATOR_P((*wfullpath)[trail_pos]))
+				break;
+			trail_pos--;
+		}
+		size = trail_pos + 1 + file_len;
+		if ((size + 1) > sizeof(*wfullpath) / sizeof((*wfullpath)[0])) {
+			wchar_t *buf = (wchar_t *)malloc((size + 1) * sizeof(wchar_t));
+			wcsncpy(buf, *wfullpath, trail_pos + 1);
+			if (heap)
+				free(*wfullpath);
+			*wfullpath = buf;
+		}
+		wcsncpy(*wfullpath + trail_pos + 1, find_data.cFileName, file_len + 1);
+	}
+	return size;
+}
+
 static VALUE
-fenix_file_expand_path_internal(VALUE path, VALUE dir, int abs_mode)
+fenix_file_expand_path_internal(VALUE path, VALUE dir, int abs_mode, int long_name)
 {
 	size_t size = 0, wpath_len = 0, wdir_len = 0, whome_len = 0;
 	size_t buffer_len = 0;
@@ -496,7 +560,6 @@ fenix_file_expand_path_internal(VALUE path, VALUE dir, int abs_mode)
 	/* Ensure buffer is NULL terminated */
 	buffer_pos[0] = L'\0';
 
-
 	/* tainted if path is relative */
 	if (!tainted && PathIsRelativeW(buffer) && !(buffer_len >= 2 && IS_DIR_UNC_P(buffer))) {
 		tainted = 1;
@@ -505,65 +568,63 @@ fenix_file_expand_path_internal(VALUE path, VALUE dir, int abs_mode)
 	// FIXME: Make this more robust
 	// Determine require buffer size
 	size = GetFullPathNameW(buffer, PATH_BUFFER_SIZE, wfullpath_buffer, NULL);
-	if (size) {
-		if (size > PATH_BUFFER_SIZE) {
-			// allocate enough memory to contain the response
-			wfullpath = (wchar_t *)xmalloc(size * sizeof(wchar_t));
-			size = GetFullPathNameW(buffer, size, wfullpath, NULL);
-		} else {
-			wfullpath = wfullpath_buffer;
-		}
-
-
-		/* Calculate the new size and leave the garbage out */
-		// size = wcslen(wfullpath);
-
-		/* Remove any trailing slashes */
-		if (IS_DIR_SEPARATOR_P(wfullpath[size - 1]) &&
-			wfullpath[size - 2] != L':' &&
-			!(size == 2 && IS_DIR_UNC_P(wfullpath))) {
-			size -= 1;
-			wfullpath[size] = L'\0';
-		}
-
-		/* Remove any trailing dot */
-		if (wfullpath[size - 1] == L'.') {
-			size -= 1;
-			wfullpath[size] = L'\0';
-		}
-
-		/* removes trailing invalid ':$DATA' */
-		size = fenix_remove_invalid_alternative_data(wfullpath, size);
-
-		/* sanitize backslashes with forwardslashes */
-		fenix_replace_wchar(wfullpath, L'\\', L'/');
-
-		/* convert to char * */
-		fenix_wchar_to_mb(wfullpath, &fullpath, &size, cp);
-
-		/* convert to VALUE and set the path encoding */
-		result = rb_enc_str_new(fullpath, size, path_encoding);
-
-		if (path_cp == INVALID_CODE_PAGE) {
-			VALUE tmp;
-			size_t len;
-
-			rb_enc_associate(result, rb_utf8_encoding());
-			ENC_CODERANGE_CLEAR(result);
-			tmp = rb_str_encode(result, rb_enc_from_encoding(path_encoding), 0, Qnil);
-			len = RSTRING_LEN(tmp);
-			rb_str_modify(result);
-			rb_str_resize(result, len);
-			memcpy(RSTRING_PTR(result), RSTRING_PTR(tmp), len);
-			rb_str_resize(tmp, 0);
-		}
-		rb_enc_associate(result, path_encoding);
-		ENC_CODERANGE_CLEAR(result);
-
-		/* makes the result object tainted if expanding tainted strings or returning modified path */
-		if (tainted)
-			OBJ_TAINT(result);
+	if (size > PATH_BUFFER_SIZE) {
+		// allocate enough memory to contain the response
+		wfullpath = (wchar_t *)xmalloc(size * sizeof(wchar_t));
+		size = GetFullPathNameW(buffer, size, wfullpath, NULL);
+	} else {
+		wfullpath = wfullpath_buffer;
 	}
+
+	/* Remove any trailing slashes */
+	if (IS_DIR_SEPARATOR_P(wfullpath[size - 1]) &&
+		wfullpath[size - 2] != L':' &&
+		!(size == 2 && IS_DIR_UNC_P(wfullpath))) {
+		size -= 1;
+		wfullpath[size] = L'\0';
+	}
+
+	/* Remove any trailing dot */
+	if (wfullpath[size - 1] == L'.') {
+		size -= 1;
+		wfullpath[size] = L'\0';
+	}
+
+	/* removes trailing invalid ':$DATA' */
+	size = fenix_remove_invalid_alternative_data(wfullpath, size);
+
+	/* Replace the trailing path to long name */
+	if (long_name)
+		size = fenix_replace_to_long_name(&wfullpath, size, (wfullpath != wfullpath_buffer));
+
+	/* sanitize backslashes with forwardslashes */
+	fenix_replace_wchar(wfullpath, L'\\', L'/');
+
+	/* convert to char * */
+	fenix_wchar_to_mb(wfullpath, &fullpath, &size, cp);
+
+	/* convert to VALUE and set the path encoding */
+	result = rb_enc_str_new(fullpath, size, path_encoding);
+
+	if (path_cp == INVALID_CODE_PAGE) {
+		VALUE tmp;
+		size_t len;
+
+		rb_enc_associate(result, rb_utf8_encoding());
+		ENC_CODERANGE_CLEAR(result);
+		tmp = rb_str_encode(result, rb_enc_from_encoding(path_encoding), 0, Qnil);
+		len = RSTRING_LEN(tmp);
+		rb_str_modify(result);
+		rb_str_resize(result, len);
+		memcpy(RSTRING_PTR(result), RSTRING_PTR(tmp), len);
+		rb_str_resize(tmp, 0);
+	}
+	rb_enc_associate(result, path_encoding);
+	ENC_CODERANGE_CLEAR(result);
+
+	/* makes the result object tainted if expanding tainted strings or returning modified path */
+	if (tainted)
+		OBJ_TAINT(result);
 
 	/* TODO: better cleanup */
 	if (buffer)
@@ -596,13 +657,26 @@ fenix_file_expand_path(int argc, VALUE *argv)
 	rb_scan_args(argc, argv, "11", &path, &dir);
 
 	/* reuse fenix_file_expand_path_internal without absolute enabled */
-	return fenix_file_expand_path_internal(path, dir, 0);
+	return fenix_file_expand_path_internal(path, dir, 0, 1);
+}
+
+static VALUE
+fenix_file_expand_path_fast(int argc, VALUE *argv)
+{
+	VALUE path = Qnil, dir = Qnil;
+
+	/* retrieve path and dir from argv */
+	rb_scan_args(argc, argv, "11", &path, &dir);
+
+	/* reuse fenix_file_expand_path_internal without absolute enabled */
+	return fenix_file_expand_path_internal(path, dir, 0, 0);
 }
 
 static VALUE
 fenix_file_replace()
 {
 	rb_define_singleton_method(rb_cFile, "expand_path", fenix_file_expand_path, -1);
+
 	return Qtrue;
 }
 
@@ -615,6 +689,7 @@ Init_fenix_file()
 
 	rb_define_singleton_method(cFenixFile, "replace!", fenix_file_replace, 0);
 	rb_define_singleton_method(cFenixFile, "expand_path", fenix_file_expand_path, -1);
+	rb_define_singleton_method(cFenixFile, "expand_path_fast", fenix_file_expand_path_fast, -1);
 
 	rb_code_page = rb_hash_new();
 

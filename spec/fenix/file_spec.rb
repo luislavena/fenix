@@ -259,7 +259,6 @@ describe Fenix::File do
       end
 
       it "expands a shortname directory into the full version [ruby-core:39504]" do
-        skip "not implement"
         subject.expand_path(@shortname).must_include long_name
       end
     end
