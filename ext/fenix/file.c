@@ -311,13 +311,6 @@ fenix_replace_to_long_name(wchar_t **wfullpath, size_t size, int heap) {
 		pos--;
 	}
 
-	/*
-	  Avoid FindFirstFileW over non-existing path.
-	  GetFileAttributesW is faster to check if path doesn't exists.
-	*/
-	if (GetFileAttributesW(*wfullpath) == INVALID_FILE_ATTRIBUTES)
-		return size;
-
 	find_handle = FindFirstFileW(*wfullpath, &find_data);
 	if (find_handle != INVALID_HANDLE_VALUE) {
 		size_t trail_pos = wcslen(*wfullpath);
