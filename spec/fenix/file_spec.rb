@@ -296,6 +296,13 @@ describe Fenix::File do
         subject.expand_path("~").encoding.must_equal Encoding.find("filesystem")
         subject.expand_path("~", "C:/").encoding.must_equal Encoding.find("filesystem")
       end
+
+      it "expands ~ (home) using filesystem encoding disregard of encoding used" do
+        path = "~".encode("US-ASCII")
+        dir = "C:/".encode("IBM437")
+        subject.expand_path(path).encoding.must_equal Encoding.find("filesystem")
+        subject.expand_path(path, dir).encoding.must_equal Encoding.find("filesystem")
+      end
     end
   end
 
