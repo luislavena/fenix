@@ -299,7 +299,14 @@ fenix_replace_to_long_name(wchar_t **wfullpath, size_t size, int heap) {
 	size_t const max_short_name_size = 8 + 1 + 3;
 	size_t const max_extension_size = 3;
 	size_t path_len = 1, extension_len = 0;
-	wchar_t *pos = *wfullpath + size - 1;
+	wchar_t *pos = *wfullpath;
+
+	if (size == 3 && pos[1] == L':' && pos[2] == L'\\' && pos[3] == L'\0') {
+		/* root path doesn't need short name expansion */
+		return size;
+	}
+
+	pos = *wfullpath + size - 1;
 	while (!IS_DIR_SEPARATOR_P(*pos) && pos != *wfullpath) {
 		if (!extension_len && *pos == L'.') {
 			extension_len = path_len - 1;
