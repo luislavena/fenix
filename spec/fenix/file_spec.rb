@@ -291,6 +291,11 @@ describe Fenix::File do
         path = "\u3042\u3044\u3046\u3048\u304a".encode("CP51932")
         subject.expand_path(path).must_equal "#{Dir.pwd}/#{path}"
       end
+
+      it "expands ~ (home) with filesystem encoding" do
+        subject.expand_path("~").encoding.must_equal Encoding.find("filesystem")
+        subject.expand_path("~", "C:/").encoding.must_equal Encoding.find("filesystem")
+      end
     end
   end
 

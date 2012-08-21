@@ -396,6 +396,10 @@ fenix_file_expand_path_internal(VALUE path, VALUE dir, int abs_mode, int long_na
 			rb_raise(rb_eArgError, "non-absolute home");
 		}
 
+		/* use filesystem encoding if expanding home dir */
+		path_encoding = rb_filesystem_encoding();
+		cp = path_cp = system_code_page();
+
 		/* ignores dir since we are expading home */
 		ignore_dir = 1;
 
