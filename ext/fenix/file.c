@@ -226,10 +226,8 @@ fenix_code_page(rb_encoding *enc)
 	ENCODING_CODERANGE_SET(name_key, rb_usascii_encindex(), ENC_CODERANGE_7BIT);
 
 	code_page_value = rb_hash_lookup(rb_code_page, name_key);
-	if (code_page_value != Qnil) {
-		// printf("cached code page: %i\n", FIX2INT(code_page_value));
+	if (code_page_value != Qnil)
 		return (UINT)FIX2INT(code_page_value);
-	}
 
 	name_key = rb_usascii_str_new2(enc_name);
 
